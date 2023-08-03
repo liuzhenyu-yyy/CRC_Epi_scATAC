@@ -12,9 +12,6 @@ load("Epi_Molecular_Subtype.RData")
 # 1. prepare ArchR project ----
 ## 1.1 load saved project ----
 proj_Epi <- loadArchRProject(project.dir.epi, force = TRUE)
-proj_all <- loadArchRProject(project.dir.all, force = TRUE)
-colnames(proj_all@cellColData)
-proj_all$Clusters_type %>% table()
 proj_Epi$Sample %>% table()
 
 proj_Epi$Epi_type <- "Malignant"
@@ -130,23 +127,36 @@ quantile(dip.pvalue)
 dip.pvalue[1:5]
 feature.selcted <- dip.pvalue[dip.pvalue < 0.05] %>% names()
 table(dip.pvalue < 0.05)
-input.data <- sePeaks@assays@data$PeakMatrix[feature.selcted, sample.selected]
+
+# by SD
+SDs <- apply(sePeaks@assays@data$PeakMatrix, 1, sd)
+quantile(SDs)
+table(SDs > 0.5)
+feature.selcted <- sort(SDs, decreasing = TRUE) %>%
+    head(5000) %>%
+    names()
+feature.selcted <- sort(SDs, decreasing = TRUE) %>%
+    head(15000) %>%
+    names()
 
 ## 3.2. run NMF ----
-res.ranks <- nmf(peatmat[feature.selcted, sample.selected], 2:10, nrun = 50)
+input.data <- sePeaks@assays@data$PeakMatrix[feature.selcted, sample.selected]
 
-pdf("NMF.rank.res.pdf", 8, 6)
-plot(res.ranks)
-dev.off()
-rm(res.ranks)
+# res.ranks <- nmf(peatmat[feature.selcted, sample.selected], 2:10, nrun = 50)
+
+# pdf("NMF.rank.res.pdf", 8, 6)
+# plot(res.ranks)
+# dev.off()
+# rm(res.ranks)
 
 peak.num.2c <- nmf(input.data,
-    rank = 2
+    rank = 2,
+    nrun = 10
 )
 predict(peak.num.2c)
-clusters.res$Peak_NMF <- predict(peak.num.2c)[sample.selected] %>%
+clusters.res$Peak_NMF3 <- predict(peak.num.2c)[sample.selected] %>%
     as.numeric()
-pdf("NMF.2clusters.pdf", 5,4 )
+pdf("NMF.2clusters.SD.pdf", 5, 4)
 NMF::consensusmap(peak.num.2c)
 dev.off()
 aricode::AMI(
@@ -165,6 +175,7 @@ CNV.FC <- aggregate(CNV.FC,
 )
 rownames(CNV.FC) <- CNV.FC$Group.1
 CNV.FC$Group.1 <- NULL
+pheatmap(CNV.FC[1:5, 1:5])
 
 pdf("Heatmap.CNV.merge2.pdf", 8, 6)
 pheatmap::pheatmap(CNV.FC[sample.selected, ],
@@ -181,7 +192,8 @@ pheatmap::pheatmap(CNV.FC[sample.selected, ],
     gaps_col = which(!duplicated(anno.col$seqnames)) - 1
 )
 dev.off()
-
+aricode::AMI(clusters.res$Peak_NMF, clusters.res$Peak_NMF2)
+table(clusters.res$Peak_NMF, clusters.res$Peak_NMF2)
 # hclust of malignant clusters
 hc.tumor.CNV <- hclust(
     d = dist(CNV.FC[sample.selected, ]),

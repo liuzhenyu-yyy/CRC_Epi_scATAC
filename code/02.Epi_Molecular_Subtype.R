@@ -23,6 +23,17 @@ p <- plotEmbedding(
 pdf("UAMP.Epi.Epi_type.pdf", 7, 7)
 plot(p)
 dev.off()
+
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    name = "Clusters", embedding = "UMAP",
+    size = 0.2, plotAs = "points"
+)
+
+pdf("UAMP.Epi.Clusters.pdf", 7, 7)
+plot(p)
+dev.off()
+
 sample.info.epi <- proj_Epi@cellColData %>% as.data.frame()
 
 AMI.cluster <- c(
@@ -65,7 +76,7 @@ for (one in colnames(temp)) {
         )
 }
 sample.info.epi <- proj_Epi@cellColData %>% as.data.frame()
-rm(temp)
+rm(temp, one)
 
 # color palette
 RColorBrewer::display.brewer.all()
@@ -106,7 +117,7 @@ pdf("UAMP.Epi.Side.pdf", 7, 7)
 plot(p)
 dev.off()
 
-## 1.3 pseudo-bulk repicates ----
+## 1.3. pseudo-bulk repicates ----
 proj_Epi@projectMetadata$GroupCoverages$Clusters$Param
 proj_Epi@projectMetadata$GroupCoverages$Clusters$coverageMetadata[, 3] # all cell??
 
@@ -136,63 +147,13 @@ sePeaks <- getGroupSE(
 dim(sePeaks)
 sample.selected <- setdiff(rownames(sePeaks@colData), c("C3", "C4", "C28", "C9"))
 
-# 2. clustering in peak space ----
-## 2.1. feature selection by DIP test ----
-dip.pvalue <- apply(sePeaks@assays@data$PeakMatrix, 1, function(x) {
-    return(diptest::dip.test(x)$p.value)
-})
-quantile(dip.pvalue)
-table(dip.pvalue < 0.05)
-feature.selcted <- dip.pvalue[dip.pvalue < 0.05] %>% names()
-
-## 2.2. hclust of malignant clusters ----
-input.data <- sePeaks@assays@data$PeakMatrix[feature.selcted, sample.selected]
-hc.tumor <- hclust(
-    d = dist(t(input.data)),
-    method = "ward.D2"
-)
-rm(input.data)
-
-plot(hc.tumor)
-rect.hclust(
-    tree = hc.tumor,
-    k = 2, which = 1:2, border = c("#62b7e6", "#283891"),
-    cluster = cutree(tree = hc.tumor, k = 2)
-)
-group.res <- cutree(tree = hc.tumor, k = 2)
-
-proj_Epi$Epi_Group <- proj_Epi$Epi_type
-proj_Epi$Epi_Group[proj_Epi$Epi_Group == "Malignant"] <-
-    paste("Group_",
-        (group.res[proj_Epi$Clusters[proj_Epi$Epi_Group == "Malignant"]]),
-        sep = ""
-    )
-rm(group.res)
-table(proj_Epi$Epi_Group)
-
-mycolor[["Epi_Group"]] <- c(
-    "Normal" = "#208a42", "Adenoma" = "#d51f26",
-    "Group_1" = "#62b7e6", "Group_2" = "#283891"
-)
-p <- plotEmbedding(
-    ArchRProj = proj_Epi, colorBy = "cellColData",
-    name = "Epi_Group", embedding = "UMAP",
-    pal = mycolor$Epi_Group,
-    size = 0.2, plotAs = "points"
-)
-pdf("UAMP.Epi.Epi_Group.pdf", 7, 7)
-plot(p)
-dev.off()
-
-## 2.3. plot hclust ----
-cluster.info <- as.data.frame(cutree(hc.tumor, 2))
-identical(rownames(cluster.info), sample.selected)
-colnames(cluster.info) <- "Group"
-cluster.info$Group <- paste("Group_", cluster.info$Group, sep = "")
-cluster.info$Count <- table(sample.info.epi$Clusters)[rownames(cluster.info)]
+## 1.4. annotate clusters ----
+cluster.info <- colData(sePeaks) %>%
+    as.data.frame() %>%
+    .[sample.selected, ]
 
 # annotate clusters
-for (one in c("Patient", "Gender", "MSI_Status", "Side")){
+for (one in c("Patient", "Gender", "MSI_Status", "Side")) {
     temp <- aggregate(sample.info.epi[, one],
         by = list(sample.info.epi$Clusters),
         FUN = function(x) {
@@ -210,41 +171,82 @@ for (one in c("Patient", "Gender", "MSI_Status", "Side")){
     )
     rownames(temp) <- temp$Group.1
     cluster.info[, paste0(one, "_Major_Count")] <- temp[sample.selected, ]$x
-    cluster.info[, paste0(one, "_Major_Pct")] <- cluster.info[, paste0(one, "_Major_Count")] / cluster.info$Count
+    cluster.info[, paste0(one, "_Major_Pct")] <- cluster.info[, paste0(one, "_Major_Count")] / cluster.info$nCells
 }
 rm(temp, one)
 
-dend <- as.dendrogram(hc.tumor)
-dend.color <- data.frame(
-    row.names = rownames(cluster.info),
-    "Gender" = mycolor$Gender[cluster.info$Gender_Major],
-    "Side" = mycolor$Side[cluster.info$Side_Major],
-    "MSI" = mycolor$MSI[cluster.info$MSI_Status_Major],
-    "Group" = mycolor$Group[cluster.info$Group]
+# 2. clustering in peak space ----
+library(NMF)
+
+## 2.1. NMF of malignant clusters ----
+# feature selection by SD
+SDs <- apply(sePeaks@assays@data$PeakMatrix, 1, sd)
+quantile(SDs)
+feature.selcted <- sort(SDs, decreasing = TRUE) %>%
+    head(10000) %>%
+    names()
+
+# run NMF with 2 clusters
+NMF.res <- nmf(
+    sePeaks@assays@data$PeakMatrix[feature.selcted, sample.selected],
+    rank = 2,
+    nrun = 200
 )
 
-temp <- mycolor[c(4, 2, 3, 1)] %>% unlist()
-names(temp) <- gsub("^.+?\\.", "", names(temp))
-temp <- temp[c(1, 3, 6, 8, 5, 2, 4, 7, 9)]
+# ref <- c(1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 2)
+# names(ref) <- sample.selected
+# table(ref, predict(NMF.res))
+# rm(ref)
 
-pdf("Dendrogram.Tumor.clusters.pdf", 6, 4)
-plot(dend, main = "Hierarchical clustering of malignant clusters")
-dendextend::colored_bars(
-    colors = dend.color, dend = dend,
-    y_scale = 10, y_shift = -8
+group.res <- predict(NMF.res) %>%
+    as.numeric()
+group.res <- (3 - group.res) %>%
+    paste("Group_", ., sep = "")
+names(group.res) <- sample.selected
+
+cluster.info$Epi_Group <- group.res[rownames(cluster.info)]
+
+proj_Epi$Epi_Group <- proj_Epi$Epi_type
+proj_Epi$Epi_Group[proj_Epi$Epi_Group == "Malignant"] <-
+    group.res[proj_Epi$Clusters[proj_Epi$Epi_Group == "Malignant"]]
+table(proj_Epi$Epi_Group)
+
+mycolor[["Epi_Group"]] <- c(
+    "Normal" = "#208a42", "Adenoma" = "#d51f26",
+    "Group_1" = "#62b7e6", "Group_2" = "#283891"
 )
-legend("topright",
-    legend = names(temp), col = temp,
-    pch = 15, bty = "n",
-    pt.cex = 1.2, cex = 0.8,
-    ncol = 2
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    name = "Epi_Group", embedding = "UMAP",
+    pal = mycolor$Epi_Group,
+    size = 0.2, plotAs = "points"
+)
+pdf("UAMP.Epi.Epi_Group.pdf", 7, 7)
+plot(p)
+dev.off()
+
+## 2.3. visualize NMF results ----
+con.mat <- NMF.res@consensus
+sil <- silhouette(NMF.res, what = "consensus")
+
+anno.col <- cluster.info %>%
+    select(c("Gender_Major", "MSI_Status_Major", "Side_Major", "Epi_Group"))
+colnames(anno.col) <- names(mycolor)[c(1:4)]
+anno.col$silhouette <- sil[, 3][rownames(anno.col)]
+
+pdf("NMF.consensus.clusters.pdf", 7, 6)
+pheatmap(con.mat,
+    annotation_col = anno.col[c(5, 4, 3, 2, 1)],
+    annotation_colors = mycolor[colnames(anno.col)],
+    border_color = NA,
+    cutree_rows = 2,
+    cutree_cols = 2
 )
 dev.off()
-rm(dend, dend.color, temp, p)
-
+rm(con.mat, sil, p)
 save.image("Epi_Molecular_Subtype.RData")
 
-# 4. cluster in CNV space ----
+# 3. cluster in CNV space ----
 load("../01.All_scCNV/CRC_CNV.rda")
 
 CNV.FC <- CNV.FC[rownames(sample.info.epi), ]
