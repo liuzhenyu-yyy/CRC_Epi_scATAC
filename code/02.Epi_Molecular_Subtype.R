@@ -73,8 +73,9 @@ for (one in colnames(temp)) {
         name = one,
         cells = rownames(temp),
         force = TRUE
-        )
+    )
 }
+proj_Epi$MSI_Status[proj_Epi$Epi_type == "Normal"] <- "MSS"
 sample.info.epi <- proj_Epi@cellColData %>% as.data.frame()
 rm(temp, one)
 
@@ -103,7 +104,7 @@ p <- plotEmbedding(
     pal = mycolor$MSI,
     size = 0.2, plotAs = "points"
 )
-pdf("UAMP.Epi.MSI_Status.pdf", 7, 7)
+pdf("UAMP.Epi.MSI_Status1.pdf", 7, 7)
 plot(p)
 dev.off()
 
@@ -186,12 +187,22 @@ feature.selcted <- sort(SDs, decreasing = TRUE) %>%
     head(10000) %>%
     names()
 
+NMF.test <- nmf(
+    sePeaks@assays@data$PeakMatrix[feature.selcted, sample.selected],
+    rank = 2:10,
+    nrun = 30
+)
+pdf("NMF.rank.test.pdf", 8, 6)
+plot(NMF.test)
+dev.off()
+
 # run NMF with 2 clusters
 NMF.res <- nmf(
     sePeaks@assays@data$PeakMatrix[feature.selcted, sample.selected],
     rank = 2,
     nrun = 200
 )
+
 
 # ref <- c(1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 2)
 # names(ref) <- sample.selected
@@ -205,6 +216,7 @@ group.res <- (3 - group.res) %>%
 names(group.res) <- sample.selected
 
 cluster.info$Epi_Group <- group.res[rownames(cluster.info)]
+sample.info.epi$Epi_Group <- group.res[sample.info.epi$Clusters]
 
 proj_Epi$Epi_Group <- proj_Epi$Epi_type
 proj_Epi$Epi_Group[proj_Epi$Epi_Group == "Malignant"] <-
@@ -226,6 +238,7 @@ plot(p)
 dev.off()
 
 ## 2.3. visualize NMF results ----
+# conseusus matrix
 con.mat <- NMF.res@consensus
 sil <- silhouette(NMF.res, what = "consensus")
 
@@ -243,67 +256,54 @@ pheatmap(con.mat,
     cutree_cols = 2
 )
 dev.off()
-rm(con.mat, sil, p)
+
+# coefficient matrix ----
+coefmap(NMF.res)
+coef.mat <- coef(NMF.res)
+rownames(coef.mat) <- c("Basis1", "Basis2")
+
+pdf("NMF.coefficient.clusters.pdf", 6, 3)
+pheatmap(coef.mat[, order(coef.mat[1, ] - coef.mat[2, ])],
+    annotation_col = anno.col[c(4)],
+    annotation_colors = mycolor[colnames(anno.col)],
+    cluster.rows = FALSE,
+    cluster_cols = FALSE,
+    border_color = NA,
+    clustering_method = "complete"
+)
+dev.off()
+
+rm(con.mat, coef.mat, sil, p, anno.col)
+
 save.image("Epi_Molecular_Subtype.RData")
 
 # 3. cluster in CNV space ----
 load("../01.All_scCNV/CRC_CNV.rda")
+rm(sample.info, anno.row)
 
-CNV.FC <- CNV.FC[rownames(sample.info.epi), ]
+cell.selected <- sample.info.epi %>%
+    filter(Clusters %in% sample.selected) %>%
+    rownames()
 
-CNV.FC <- aggregate(CNV.FC,
-    by = list(sample.info.epi$Clusters),
-    FUN = mean
-)
-rownames(CNV.FC) <- CNV.FC$Group.1
-CNV.FC$Group.1 <- NULL
+anno.row <- sample.info.epi[cell.selected, ] %>%
+    select(c("Side", "MSI_Status", "Epi_Group"))
+colnames(anno.row)[2] <- "MSI"
+CNV.FC <- CNV.FC[cell.selected, ]
 
-pdf("Heatmap.CNV.merge2.pdf", 8, 6)
-pheatmap::pheatmap(CNV.FC[sample.selected, ],
+png("Heatmap.CNV.cell.wardd2.png", 1000, 750)
+pheatmap::pheatmap(CNV.FC,
     color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
+    border_color = FALSE,
     cluster_rows = TRUE, cluster_cols = FALSE,
     clustering_method = "ward.D2",
     annotation_col = anno.col,
-    annotation_row = clusters.res,
-    annotation_colors = anno.color,
+    annotation_row = anno.row,
+    annotation_colors = c(anno.color, mycolor)[c(colnames(anno.row), "seqnames")],
     annotation_legend = FALSE,
-    show_rownames = TRUE,
+    show_rownames = FALSE,
     show_colnames = FALSE,
-    cutree_rows = 2,
     gaps_col = which(!duplicated(anno.col$seqnames)) - 1
 )
 dev.off()
 
-# hclust of malignant clusters
-hc.tumor.CNV <- hclust(
-    d = dist(CNV.FC[sample.selected, ]),
-    method = "ward.D2"
-)
-pdf("Dendrogram.Tumor.CNV.clusters.pdf", 6, 5)
-plot(hc.tumor.CNV, main = "Hierarchical clustering of malignant clusters")
-dev.off()
-
-rm(CNV.FC, sample.info, anno.col, anno.row, anno.color)
-
-clusters.res$CNV_HC <- cutree(hc.tumor.CNV, 2)[sample.selected]
-
-aricode::AMI(clusters.res$Peak_NMF, clusters.res$CNV_HC)
-aricode::AMI(clusters.res$Peak_NMF, clusters.res$LSI_HC)
-aricode::AMI(clusters.res$LSI_HC, clusters.res$CNV_HC)
-
-
-
-hc.tumor.peak <- hclust(
-    d = dist(t(peatmat[feature.selcted, sample.selected])),
-    method = "ward.D2"
-)
-pdf("Dendrogram.Tumor.peak.clusters.pdf", 6, 5)
-plot(hc.tumor.peak)
-dev.off()
-
-cutree(hc.tumor, 2)[sample.selected]
-cutree(hc.tumor.peak, 2)[sample.selected]
-aricode::AMI(
-    cutree(hc.tumor, 2)[sample.selected],
-    cutree(hc.tumor.peak, 2)[sample.selected]
-)
+rm(CNV.FC, anno.col, anno.row, anno.color)
