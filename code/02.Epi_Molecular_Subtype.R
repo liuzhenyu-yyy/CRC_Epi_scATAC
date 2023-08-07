@@ -17,7 +17,8 @@ table(proj_Epi$Epi_type, proj_Epi$new_location)
 p <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "cellColData",
     name = "Epi_type", embedding = "UMAP",
-    size = 0.2, plotAs = "points"
+    size = 0.2, plotAs = "points",
+    labelMeans = FALSE
 )
 
 pdf("UAMP.Epi.Epi_type.pdf", 7, 7)
@@ -92,7 +93,8 @@ p <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "cellColData",
     name = "Gender", embedding = "UMAP",
     pal = mycolor$Gender,
-    size = 0.2, plotAs = "points"
+    size = 0.2, plotAs = "points",
+    labelMeans = FALSE
 )
 pdf("UAMP.Epi.Gender.pdf", 7, 7)
 plot(p)
@@ -102,7 +104,8 @@ p <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "cellColData",
     name = "MSI_Status", embedding = "UMAP",
     pal = mycolor$MSI,
-    size = 0.2, plotAs = "points"
+    size = 0.2, plotAs = "points",
+    labelMeans = FALSE
 )
 pdf("UAMP.Epi.MSI_Status1.pdf", 7, 7)
 plot(p)
@@ -112,7 +115,8 @@ p <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "cellColData",
     name = "Side", embedding = "UMAP",
     pal = mycolor$Side,
-    size = 0.2, plotAs = "points"
+    size = 0.2, plotAs = "points",
+    labelMeans = FALSE
 )
 pdf("UAMP.Epi.Side.pdf", 7, 7)
 plot(p)
@@ -203,7 +207,6 @@ NMF.res <- nmf(
     nrun = 200
 )
 
-
 # ref <- c(1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 2)
 # names(ref) <- sample.selected
 # table(ref, predict(NMF.res))
@@ -257,7 +260,7 @@ pheatmap(con.mat,
 )
 dev.off()
 
-# coefficient matrix ----
+# coefficient matrix
 coefmap(NMF.res)
 coef.mat <- coef(NMF.res)
 rownames(coef.mat) <- c("Basis1", "Basis2")
@@ -275,9 +278,74 @@ dev.off()
 
 rm(con.mat, coef.mat, sil, p, anno.col)
 
-save.image("Epi_Molecular_Subtype.RData")
+# 3. compare with known iCMS features ----
+## 3.1. with clinical information ----
+group.count <- table(cluster.info$Epi_Group)
 
-# 3. cluster in CNV space ----
+# MSI
+plot.data <- table(cluster.info %>%
+    select(c("Epi_Group", "MSI_Status_Major"))) %>%
+    as.data.frame()
+plot.data$Epi_Group <- factor(plot.data$Epi_Group,
+    levels = c("Group_2", "Group_1")
+)
+p1 <- ggplot(plot.data) +
+    geom_bar(aes(x = Epi_Group, y = Freq, fill = MSI_Status_Major),
+        stat = "identity", position =  position_fill(reverse = TRUE)
+    ) +
+    geom_text(aes(x = Epi_Group, y = Freq, label = Freq),
+        position = position_fill(vjust = 0.5)
+    ) +
+    scale_fill_manual(values = mycolor$MSI) +
+        coord_flip() +
+        theme_classic() +
+        theme(axis.title = element_blank())
+
+## Side
+plot.data <- table(cluster.info %>%
+    select(c("Epi_Group", "Side_Major"))) %>%
+    as.data.frame()
+plot.data$Epi_Group <- factor(plot.data$Epi_Group,
+    levels = c("Group_2", "Group_1")
+)
+p2 <- ggplot(plot.data) +
+    geom_bar(aes(x = Epi_Group, y = Freq, fill = Side_Major),
+        stat = "identity", position = position_fill(reverse = TRUE)
+    ) +
+    geom_text(aes(x = Epi_Group, y = Freq, label = Freq),
+        position = position_fill(vjust = 0.5)
+    ) +
+    scale_fill_manual(values = mycolor$Side) +
+    coord_flip() +
+    theme_classic() +
+        theme(axis.title = element_blank())
+
+## Gender
+plot.data <- table(cluster.info %>%
+    select(c("Epi_Group", "Gender_Major"))) %>%
+    as.data.frame()
+plot.data$Epi_Group <- factor(plot.data$Epi_Group,
+    levels = c("Group_2", "Group_1")
+)
+p3 <- ggplot(plot.data) +
+    geom_bar(aes(x = Epi_Group, y = Freq, fill = Gender_Major),
+        stat = "identity", position = position_fill(reverse = TRUE)
+    ) +
+    geom_text(aes(x = Epi_Group, y = Freq, label = Freq),
+        position = position_fill(vjust = 0.5)
+    ) +
+    scale_fill_manual(values = mycolor$Gender) +
+        coord_flip() +
+        theme_classic() +
+        theme(axis.title.y = element_blank()) +
+        ylab("Fraction")
+
+pdf("Bar.Clinical.Group.pdf", 6, 4)
+wrap_plots(p1, p2, p3, ncol = 1)
+dev.off()
+rm(plot.data, p1, p2, p3, group.count)
+
+## 3.2. CNV profile ----
 load("../01.All_scCNV/CRC_CNV.rda")
 rm(sample.info, anno.row)
 
@@ -307,3 +375,86 @@ pheatmap::pheatmap(CNV.FC,
 dev.off()
 
 rm(CNV.FC, anno.col, anno.row, anno.color)
+
+## 3.3. iCMS signatures ----
+markers.iCMS <- read.table("E:/LabWork/Project/CRC_NGS_ATAC/iCMS markers.txt",
+    stringsAsFactors = FALSE,
+    sep = "\t", header = TRUE
+)
+markers.iCMS <- base::as.list(markers.iCMS)
+
+genes <- getFeatures(proj_Epi, useMatrix = "GeneScoreMatrix")
+
+markers.iCMS <- lapply(markers.iCMS, function(x) intersect(x, genes))
+lapply(markers.iCMS, length)
+
+proj_Epi <- addModuleScore(proj_Epi,
+    useMatrix = "GeneScoreMatrix",
+    name = "Module",
+    features = markers.iCMS
+)
+
+proj_Epi$Module.iCMS2 <- proj_Epi$Module.iCMS2_Up - proj_Epi$Module.iCMS2_Down
+proj_Epi$Module.iCMS3 <- proj_Epi$Module.iCMS3_Up - proj_Epi$Module.iCMS3_Down
+
+sample.info.epi <- proj_Epi@cellColData %>% as.data.frame()
+colnames(sample.info.epi)
+plot.data <- sample.info.epi %>%
+    filter(Epi_type == "Malignant") %>%
+    select(matches("Module|Group"))
+
+get_density <- function(x, y, nbins = 100, ...) {
+    dens <- MASS::kde2d(x, y, n = nbins, ...)
+    ix <- findInterval(x, dens$x)
+    iy <- findInterval(y, dens$y)
+    ii <- cbind(ix, iy)
+    return(dens$z[ii])
+}
+
+plot.data$Density <- get_density(plot.data$Module.iCMS2, plot.data$Module.iCMS3)
+
+pdf("Dot.Module.iCMS.pdf", 9, 4)
+p1 <- ggplot(plot.data) +
+    geom_point(aes(x = Module.iCMS2, y = Module.iCMS3, color = Density),
+        show.legend = FALSE) +
+    scale_color_viridis_c() +
+    theme_classic()
+p2 <- ggplot(plot.data) +
+    geom_point(aes(x = Module.iCMS2, y = Module.iCMS3, color = Epi_Group)) +
+    scale_color_manual(values = mycolor$Epi_Group) +
+    theme_classic()
+wrap_plots(p1, p2, ncol = 2)
+dev.off()
+
+pdf("Box.Module.iCMS.pdf", 5, 4)
+p1 <- ggplot(plot.data, aes(x = Epi_Group, y = Module.iCMS2)) +
+    geom_boxplot(aes(fill = Epi_Group),
+        show.legend = FALSE
+    ) +
+    scale_fill_manual(values = mycolor$Epi_Group) +
+    ggpubr::stat_compare_means(comparisons = list(c("Group_1", "Group_2"))) +
+    theme_classic()
+p2 <- ggplot(plot.data, aes(x = Epi_Group, y = Module.iCMS3)) +
+    geom_boxplot(aes(fill = Epi_Group),
+        show.legend = FALSE
+    ) +
+    scale_fill_manual(values = mycolor$Epi_Group) +
+    ggpubr::stat_compare_means(comparisons = list(c("Group_1", "Group_2"))) +
+    theme_classic()
+wrap_plots(p1, p2, ncol = 2)
+dev.off()
+
+proj_Epi$Module.iCMS <- proj_Epi$Module.iCMS3 - proj_Epi$Module.iCMS2
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    name = "Module.iCMS", embedding = "UMAP",
+    size = 0.2, plotAs = "points"
+)
+pdf("UAMP.Epi.Module.iCMS.pdf", 7, 7)
+plot(p)
+dev.off()
+
+rm(genes, plot.data, p, p1, p2)
+
+proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
+save.image("Epi_Molecular_Subtype.RData")
