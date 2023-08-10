@@ -1,5 +1,6 @@
 setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/02.Epi_Molecular_Subtype")
 source("../../code/00.Requirements.R")
+load("Epi_Molecular_Subtype.RData")
 
 # 1. prepare ArchR project ----
 ## 1.1 load saved project ----
@@ -132,11 +133,14 @@ proj_Epi <- addGroupCoverages(
     useLabels = FALSE,
     force = TRUE
 )
+table(proj_Epi$Clusters)
 
 getGroupBW(
     ArchRProj = proj_Epi,
     groupBy = "Clusters",
     normMethod = "ReadsInTSS",
+    tileSize = 30,
+    maxCells = 2000,
     threads = 4
 )
 getAvailableMatrices(proj_Epi)
@@ -206,6 +210,7 @@ NMF.res <- nmf(
     rank = 2,
     nrun = 200
 )
+rm(sePeaks)
 
 # ref <- c(1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 2)
 # names(ref) <- sample.selected
@@ -455,6 +460,272 @@ plot(p)
 dev.off()
 
 rm(genes, plot.data, p, p1, p2)
+
+gene.selected <- c(
+    "CXCL14", "EREG", "TIMP3", "KRT23", "FN1", "AREG", "CPNE1", "MYC", "PTPRO", "EIF6", "CTSA",
+    "TNFRSF10B", "DNAJC10", "TSTA3", "PFKP", "CDKN2A", "ATL3", "CLU", "MYOF", "DUSP4", "TM4SF4"
+)
+proj_Epi <- addImputeWeights(proj_Epi, reducedDims = "IterativeLSI_merge")
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "GeneScoreMatrix",
+    name = gene.selected, embedding = "UMAP",
+    imputeWeights = getImputeWeights(proj_Epi),
+    size = 0.2, plotAs = "points"
+)
+
+pdf("UMAP.markers.iCMS.pdf", 24, 16)
+patchwork::wrap_plots(plotlist = p, nrow = 4, ncol = 6, byrow = TRUE)
+dev.off()
+
+lapply(markers.iCMS, length)
+# 4. differential peak analysis ----
+## 4.1. identify diff peaks ----
+# call diff peaks
+table(proj_Epi$Epi_Group)
+
+marker.peak.vs.Normal <- getMarkerFeatures(
+    ArchRProj = proj_Epi,
+    useMatrix = "PeakMatrix",
+    groupBy = "Epi_Group",
+    testMethod = "wilcoxon",
+    bias = c("TSSEnrichment", "log10(nFrags)"),
+    useGroups = c("Group_1", "Group_2"),
+    bgdGroups = "Normal"
+)
+# volcano plot
+for (one in c("Group_1", "Group_2")) {
+    message(paste("plot markers Volcano for ", one, " ...", sep = ""))
+    pv <- plotMarkers(
+        seMarker = marker.peak.vs.Normal,
+        name = c(one),
+        cutOff = "FDR <= 0.01 & abs(Log2FC) >= 0.5",
+        plotAs = "Volcano"
+    )
+    pdf(paste("Volcano.markers.", one, ".pdf", sep = ""), 5, 4)
+    plot(pv)
+    dev.off()
+    rm(pv, one)
+}
+
+# heatmap
+sePeaks <- getGroupSE(
+    ArchRProj = proj_Epi,
+    useMatrix = "PeakMatrix",
+    groupBy = "Epi_Group",
+    divideN = TRUE,
+    scaleTo = NULL
+)
+
+rownames(marker.peak.vs.Normal) <- paste0("f", rownames(marker.peak.vs.Normal))
+colnames(marker.peak.vs.Normal)
+
+temp <- marker.peak.vs.Normal@assays@data
+peak.G1.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 1] >= 0.5 & temp$FDR[, 1] <= 0.01]
+peak.G1.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 1] <= (-0.5) & temp$FDR[, 1] <= 0.01]
+peak.G2.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] >= 0.5 & temp$FDR[, 2] <= 0.01]
+peak.G2.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] <= (-0.5) & temp$FDR[, 2] <= 0.01]
+rm(temp)
+
+pdf("Upset.markers.group_vs_normal.pdf", 7, 4.5)
+upset(
+    fromList(
+        list(
+            "G1.up" = peak.G1.up,
+            "G2.up" = peak.G2.up,
+            "G1.down" = peak.G1.down,
+            "G2.down" = peak.G2.down
+        )
+    ),
+    nset = 4,
+    order.by = "freq"
+)
+dev.off()
+
+anno.row <- data.frame(
+    row.names = unique(c(peak.G1.up, peak.G1.down, peak.G2.up, peak.G2.down))
+)
+anno.row$Group <-  "none"
+anno.row$Direction <- "none"
+
+anno.row[unique(c(peak.G1.up, peak.G2.up)), ]$Direction <- "Up"
+anno.row[unique(c(peak.G1.down, peak.G2.down)), ]$Direction <- "Down"
+
+anno.row[unique(c(peak.G1.up, peak.G1.down)), ]$Group <- "Group_1"
+anno.row[unique(c(peak.G2.up, peak.G2.down)), ]$Group <- "Group_2"
+
+anno.row[intersect(peak.G1.up, peak.G2.up), ]$Group <- "Both"
+anno.row[intersect(peak.G1.down, peak.G2.down), ]$Group <- "Both"
+
+anno.row[intersect(peak.G2.down, peak.G1.up), ]$Group <- "none"
+anno.row[intersect(peak.G1.down, peak.G2.up), ]$Group <- "none"
+anno.row <- anno.row[anno.row$Group != "none", ]
+table(anno.row$Group, anno.row$Direction)
+
+anno.row$Group <- factor(anno.row$Group, levels = c("Group_1", "Group_2", "Both"))
+anno.row$Direction <- factor(anno.row$Direction, levels = c("Up", "Down"))
+
+anno.row <- anno.row[order(
+    anno.row$Direction,
+    anno.row$Group,
+    sePeaks@assays@data$PeakMatrix[rownames(anno.row), "Normal"]
+), ]
+
+plot.data <- sePeaks@assays@data$PeakMatrix[
+    rownames(anno.row)[anno.row$Direction == "Up"],
+    c("Normal", "Group_1", "Group_2")
+]
+png("Heatmap.marker.tmuor.cluster.Up.png", 600, 800)
+pheatmap(plot.data,
+    scale = "row",
+    annotation_row = anno.row,
+    annotation_colors = list(
+        Group = c(Group_1 = "#62b7e6", Group_2 = "#283891", Both = "#86d786"),
+        Direction = c(Up = "#f57474", Down = "#90cdf0")),
+    cluster_rows = FALSE,
+    cluster_cols = FALSE,
+    show_rownames = FALSE
+)
+dev.off()
+
+plot.data <- sePeaks@assays@data$PeakMatrix[
+    rownames(anno.row)[anno.row$Direction == "Down"],
+    c("Normal", "Group_1", "Group_2")
+]
+
+png("Heatmap.marker.tmuor.cluster.Down.png", 600, 800)
+pheatmap(plot.data,
+    scale = "row",
+    annotation_row = anno.row,
+    annotation_colors = list(
+        Group = c(Group_1 = "#62b7e6", Group_2 = "#283891", Both = "#86d786"),
+        Direction = c(Up = "#f57474", Down = "#90cdf0")),
+    cluster_rows = FALSE,
+    cluster_cols = FALSE,
+    show_rownames = FALSE
+)
+dev.off()
+
+rm(plot.data, peak.G1.up, peak.G1.down, peak.G2.up, peak.G2.down)
+
+## 4.2. functional annotation of diff peaks ----
+# marker peak to nearest gene
+marker.peak.list <- list(
+    "Group_1" = rownames(anno.row)[anno.row$Group == "Group_1" & anno.row$Direction == "Up"],
+    "Group_2" = rownames(anno.row)[anno.row$Group == "Group_2" & anno.row$Direction == "Up"],
+    "Both" = rownames(anno.row)[anno.row$Group == "Both" & anno.row$Direction == "Up"]
+)
+lapply(marker.peak.list, length)
+rm(anno.row)
+
+peakset <- proj_Epi@peakSet
+names(peakset) <- paste(
+    seqnames(peakset), start(peakset), end(peakset),
+    sep = "_"
+)
+
+temp <- rowData(sePeaks) %>% as.data.frame()
+temp$Name <- paste(temp$seqnames, temp$start, temp$end, sep = "_")
+table(temp$Name %in% names(peakset))
+
+marker.peak.list <- lapply(
+    marker.peak.list,
+    function(x) temp[x, ]$Name
+)
+
+marker.peak2gene.list <- lapply(
+    marker.peak.list,
+    function(x) peakset[x]$nearestGene %>% unique
+)
+lapply(marker.peak2gene.list, length)
+rm(temp, sePeaks, peakset)
+
+# GO analysis
+library(clusterProfiler)
+GO.marker.list <- lapply(
+    marker.peak2gene.list,
+    function(x) {
+        res <- clusterProfiler::enrichGO(x,
+            OrgDb = org.Hs.eg.db,
+            keyType = "SYMBOL",
+            ont = "BP",
+            pAdjustMethod = "BH"
+        )
+        res <- clusterProfiler::simplify(res)
+        return(res@result)
+    }
+)
+object.size(marker.peak.list) / 1e6
+
+write.csv(GO.marker.list$Group_1, "GO.marker.Group_1.csv")
+write.csv(GO.marker.list$Group_2, "GO.marker.Group_2.csv")
+write.csv(GO.marker.list$Both, "GO.marker.Both.csv")
+plot.data <- rbind(
+    GO.marker.list$Group_1[c("GO:0033674", "GO:0043410", "GO:0032956", "GO:0042110", "GO:0050727"), ],
+    GO.marker.list$Group_2[c("GO:0001763", "GO:0198738", "GO:0016055", "GO:0019827", "GO:0051591"), ],
+    GO.marker.list$Both[c("GO:0007409", "GO:0048568", "GO:0090132", "GO:0045785", "GO:2001236"), ]
+)
+plot.data$Group <- factor(
+    rep(c("Group_1", "Group_2", "Both"), each = 5),
+    levels = c("Group_1", "Group_2", "Both")
+)
+
+plot.data <- plot.data[order(plot.data$Group,
+    plot.data$p.adjust,
+    decreasing = TRUE
+), ]
+plot.data$Description <- factor(plot.data$Description, levels = plot.data$Description)
+
+pdf("GO.marker.group.pdf", 6, 5)
+ggplot(plot.data) +
+    geom_bar(aes(x = (0 - log10(p.adjust)), y = Description, fill = Group),
+        stat = "identity", position = "dodge"
+    ) +
+    scale_fill_manual(values = c("#62b7e6", "#283891", "#86d786")) +
+    facet_wrap(~Group, ncol = 1, scales = "free_y") +
+        theme_bw() +
+        xlab("minus log10 adjusted p-value") +
+        ylab("GO term")
+dev.off()
+rm(plot.data)
+
+## 4.3. track analysis of important genes ----
+gene.selected <- c(
+    "CXCL14", "EREG", "TIMP3", "KRT23", "FN1", "AREG", "CPNE1", "MYC", "PTPRO", "EIF6", "CTSA",
+    "TNFRSF10B", "DNAJC10", "TSTA3", "PFKP", "CDKN2A", "ATL3", "CLU", "MYOF", "DUSP4", "TM4SF4"
+)
+marker.peak.tumor.gr <- getMarkers(marker.peak.vs.Normal,
+    cutOff = "FDR <= 0.01 & Log2FC >= 0.5",
+    returnGR = TRUE
+)
+write.table(as.data.frame(marker.peak.tumor.gr$Group_1)[, 1:3],
+    "marker.peak.tumor.Group_1.bed",
+    col.names = FALSE,
+    sep = "\t", quote = FALSE, row.names = FALSE
+)
+write.table(as.data.frame(marker.peak.tumor.gr$Group_2)[, 1:3],
+    "marker.peak.tumor.Group_2.bed",
+    col.names = FALSE,
+    sep = "\t", quote = FALSE, row.names = FALSE
+)
+
+track.subtype <- plotBrowserTrack(
+    ArchRProj = proj_Epi, groupBy = "Epi_Group",
+    geneSymbol = gene.selected,
+    features = marker.peak.tumor.gr,
+    upstream = 50000, downstream = 50000,
+    minCells = 10,
+    pal = mycolor$Epi_Group,
+    normMethod = "ReadsInTSS"
+)
+
+pdf("Track.Marker.iCMS.pdf", 30, 16)
+patchwork::wrap_plots(plotlist = track.subtype, nrow = 4, ncol = 6, byrow = TRUE)
+dev.off()
+# change to cluster view in IGV
+rm(gene, marker.peak.tumor.gr, p, track.subtype)
+
+# 5. TF motif analysis ----
+
 
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 save.image("Epi_Molecular_Subtype.RData")
