@@ -498,7 +498,7 @@ for (one in c("Group_1", "Group_2")) {
     pv <- plotMarkers(
         seMarker = marker.peak.vs.Normal,
         name = c(one),
-        cutOff = "FDR <= 0.01 & abs(Log2FC) >= 0.5",
+        cutOff = "FDR <= 0.01 & abs(Log2FC) >= 1",
         plotAs = "Volcano"
     )
     pdf(paste("Volcano.markers.", one, ".pdf", sep = ""), 5, 4)
@@ -520,10 +520,10 @@ rownames(marker.peak.vs.Normal) <- paste0("f", rownames(marker.peak.vs.Normal))
 colnames(marker.peak.vs.Normal)
 
 temp <- marker.peak.vs.Normal@assays@data
-peak.G1.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 1] >= 0.5 & temp$FDR[, 1] <= 0.01]
-peak.G1.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 1] <= (-0.5) & temp$FDR[, 1] <= 0.01]
-peak.G2.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] >= 0.5 & temp$FDR[, 2] <= 0.01]
-peak.G2.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] <= (-0.5) & temp$FDR[, 2] <= 0.01]
+peak.G1.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 1] >= 1 & temp$FDR[, 1] <= 0.01]
+peak.G1.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 1] <= (-1) & temp$FDR[, 1] <= 0.01]
+peak.G2.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] >= 1 & temp$FDR[, 2] <= 0.01]
+peak.G2.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] <= (-1) & temp$FDR[, 2] <= 0.01]
 rm(temp)
 
 pdf("Upset.markers.group_vs_normal.pdf", 7, 4.5)
@@ -660,7 +660,7 @@ write.csv(GO.marker.list$Group_1, "GO.marker.Group_1.csv")
 write.csv(GO.marker.list$Group_2, "GO.marker.Group_2.csv")
 write.csv(GO.marker.list$Both, "GO.marker.Both.csv")
 plot.data <- rbind(
-    GO.marker.list$Group_1[c("GO:0033674", "GO:0043410", "GO:0032956", "GO:0042110", "GO:0050727"), ],
+    GO.marker.list$Group_1[c("GO:0033674", "GO:0043410", "GO:0032956", "GO:0034329", "GO:0050727"), ],
     GO.marker.list$Group_2[c("GO:0001763", "GO:0198738", "GO:0016055", "GO:0019827", "GO:0051591"), ],
     GO.marker.list$Both[c("GO:0007409", "GO:0048568", "GO:0090132", "GO:0045785", "GO:2001236"), ]
 )
@@ -689,43 +689,92 @@ dev.off()
 rm(plot.data)
 
 ## 4.3. track analysis of important genes ----
-gene.selected <- c(
-    "CXCL14", "EREG", "TIMP3", "KRT23", "FN1", "AREG", "CPNE1", "MYC", "PTPRO", "EIF6", "CTSA",
-    "TNFRSF10B", "DNAJC10", "TSTA3", "PFKP", "CDKN2A", "ATL3", "CLU", "MYOF", "DUSP4", "TM4SF4"
-)
-marker.peak.tumor.gr <- getMarkers(marker.peak.vs.Normal,
-    cutOff = "FDR <= 0.01 & Log2FC >= 0.5",
-    returnGR = TRUE
-)
-write.table(as.data.frame(marker.peak.tumor.gr$Group_1)[, 1:3],
-    "marker.peak.tumor.Group_1.bed",
+# export bed files
+dir.create("bed")
+# marker.peak.tumor.gr <- getMarkers(marker.peak.vs.Normal,
+#     cutOff = "FDR <= 0.01 & Log2FC >= 1",
+#     returnGR = TRUE
+# )
+# lapply(marker.peak.tumor.gr, length)
+# write.table(as.data.frame(marker.peak.tumor.gr$Group_1)[, 1:3],
+#     "marker.peak.tumor.All.Group_1.bed",
+#     col.names = FALSE,
+#     sep = "\t", quote = FALSE, row.names = FALSE
+# )
+# write.table(as.data.frame(marker.peak.tumor.gr$Group_2)[, 1:3],
+#     "marker.peak.tumor.All.Group_2.bed",
+#     col.names = FALSE,
+#     sep = "\t", quote = FALSE, row.names = FALSE
+# )
+
+write.table(
+    marker.peak.list$Group_1 %>%
+        gsub("_", "\t", .) %>%
+        as.data.frame() %>%
+        mutate(
+            "Name" = marker.peak.list$Group_1,
+            "length" = 500,
+            "strand" = "."
+        ),
+    "bed/marker.peak.tumor.Group_1.specific.bed",
     col.names = FALSE,
     sep = "\t", quote = FALSE, row.names = FALSE
 )
-write.table(as.data.frame(marker.peak.tumor.gr$Group_2)[, 1:3],
-    "marker.peak.tumor.Group_2.bed",
+write.table(
+    marker.peak.list$Group_2 %>%
+        gsub("_", "\t", .) %>%
+        as.data.frame() %>%
+        mutate(
+            "Name" = marker.peak.list$Group_2,
+            "length" = 500,
+            "strand" = "."
+        ),
+    "bed/marker.peak.tumor.Group_2.specific.bed",
     col.names = FALSE,
     sep = "\t", quote = FALSE, row.names = FALSE
 )
-
-track.subtype <- plotBrowserTrack(
-    ArchRProj = proj_Epi, groupBy = "Epi_Group",
-    geneSymbol = gene.selected,
-    features = marker.peak.tumor.gr,
-    upstream = 50000, downstream = 50000,
-    minCells = 10,
-    pal = mycolor$Epi_Group,
-    normMethod = "ReadsInTSS"
+write.table(
+    marker.peak.list$Both %>% gsub("_", "\t", .) %>%
+        gsub("_", "\t", .) %>%
+        as.data.frame() %>%
+        mutate(
+            "Name" = marker.peak.list$Both,
+            "length" = 500,
+            "strand" = "."
+        ),
+    "bed/marker.peak.tumor.common.bed",
+    col.names = FALSE,
+    sep = "\t", quote = FALSE, row.names = FALSE
 )
+# gene.selected <- c(
+#     "CXCL14", "EREG", "TIMP3", "KRT23", "FN1", "AREG", "CPNE1", "MYC", "PTPRO", "EIF6", "CTSA",
+#     "TNFRSF10B", "DNAJC10", "TSTA3", "PFKP", "CDKN2A", "ATL3", "CLU", "MYOF", "DUSP4", "TM4SF4"
+# )
+# track.subtype <- plotBrowserTrack(
+#     ArchRProj = proj_Epi, groupBy = "Epi_Group",
+#     geneSymbol = gene.selected,
+#     features = marker.peak.tumor.gr,
+#     upstream = 50000, downstream = 50000,
+#     minCells = 10,
+#     pal = mycolor$Epi_Group,
+#     normMethod = "ReadsInTSS"
+# )
 
-pdf("Track.Marker.iCMS.pdf", 30, 16)
-patchwork::wrap_plots(plotlist = track.subtype, nrow = 4, ncol = 6, byrow = TRUE)
-dev.off()
+# pdf("Track.Marker.iCMS.pdf", 30, 16)
+# patchwork::wrap_plots(plotlist = track.subtype, nrow = 4, ncol = 6, byrow = TRUE)
+# dev.off()
 # change to cluster view in IGV
+
 rm(gene, marker.peak.tumor.gr, p, track.subtype)
 
 # 5. TF motif analysis ----
+## 5.1. TF enrichment in marker peaks ----
 
+# findMotifsGenome.pl bed/marker.peak.tumor.Group_1.specific.bed hg38 homer/Group_1 -size 200
+
+homer.res.Group1 <- fread("homer/Group_1/knownResults.txt",
+    header = TRUE
+)
 
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 save.image("Epi_Molecular_Subtype.RData")
