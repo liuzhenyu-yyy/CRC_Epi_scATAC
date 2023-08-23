@@ -498,7 +498,7 @@ for (one in c("Group_1", "Group_2")) {
     pv <- plotMarkers(
         seMarker = marker.peak.vs.Normal,
         name = c(one),
-        cutOff = "FDR <= 0.01 & abs(Log2FC) >= 1",
+        cutOff = "FDR <= 0.01 & abs(Log2_Enrichment) >= 1",
         plotAs = "Volcano"
     )
     pdf(paste("Volcano.markers.", one, ".pdf", sep = ""), 5, 4)
@@ -520,10 +520,10 @@ rownames(marker.peak.vs.Normal) <- paste0("f", rownames(marker.peak.vs.Normal))
 colnames(marker.peak.vs.Normal)
 
 temp <- marker.peak.vs.Normal@assays@data
-peak.G1.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 1] >= 1 & temp$FDR[, 1] <= 0.01]
-peak.G1.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 1] <= (-1) & temp$FDR[, 1] <= 0.01]
-peak.G2.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] >= 1 & temp$FDR[, 2] <= 0.01]
-peak.G2.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] <= (-1) & temp$FDR[, 2] <= 0.01]
+peak.G1.up <- rownames(marker.peak.vs.Normal)[temp$Log2_Enrichment[, 1] >= 1 & temp$FDR[, 1] <= 0.01]
+peak.G1.down <- rownames(marker.peak.vs.Normal)[temp$Log2_Enrichment[, 1] <= (-1) & temp$FDR[, 1] <= 0.01]
+peak.G2.up <- rownames(marker.peak.vs.Normal)[temp$Log2_Enrichment[, 2] >= 1 & temp$FDR[, 2] <= 0.01]
+peak.G2.down <- rownames(marker.peak.vs.Normal)[temp$Log2_Enrichment[, 2] <= (-1) & temp$FDR[, 2] <= 0.01]
 rm(temp)
 
 pdf("Upset.markers.group_vs_normal.pdf", 7, 4.5)
@@ -692,7 +692,7 @@ rm(plot.data)
 # export bed files
 dir.create("bed")
 # marker.peak.tumor.gr <- getMarkers(marker.peak.vs.Normal,
-#     cutOff = "FDR <= 0.01 & Log2FC >= 1",
+#     cutOff = "FDR <= 0.01 & Log2_Enrichment >= 1",
 #     returnGR = TRUE
 # )
 # lapply(marker.peak.tumor.gr, length)
@@ -734,7 +734,8 @@ write.table(
     sep = "\t", quote = FALSE, row.names = FALSE
 )
 write.table(
-    marker.peak.list$Both %>% gsub("_", "\t", .) %>%
+    marker.peak.list$Both %>%
+        gsub("_", "\t", .) %>%
         gsub("_", "\t", .) %>%
         as.data.frame() %>%
         mutate(
@@ -767,14 +768,135 @@ write.table(
 
 rm(gene, marker.peak.tumor.gr, p, track.subtype)
 
-# 5. TF motif analysis ----
-## 5.1. TF enrichment in marker peaks ----
-
+# 5. TF enrichment in marker peaks ----
+## 5.1. run HOMER ----
 # findMotifsGenome.pl bed/marker.peak.tumor.Group_1.specific.bed hg38 homer/Group_1 -size 200
+homer.parser <- function(res, log.p.value = 50, log2.enrichment = 1) {
+    res <- fread(res,
+        header = TRUE
+    ) %>%
+        as.data.frame() %>%
+        .[order(.[, 1]), ]
+    colnames(res) <- c(
+        "Name", "Consensus", "p.value", "log.p.value", "q.value",
+        "n.Targets", "Perc.Targets", "n.Background", "Perc.Background"
+    )
+    res$Perc.Targets <- res$Perc.Targets %>%
+        gsub("%", "", .) %>%
+        as.numeric()
+    res$Perc.Background <- res$Perc.Background %>%
+        gsub("%", "", .) %>%
+        as.numeric()
+    res$Log2_Enrichment <- log2(res$Perc.Targets / res$Perc.Background)
+    res$log.p.value <- 0 - res$log.p.value
+    res$TF <- gsub("\\(.+?$", "", res$Name) %>% toupper()
+    res <- res[!duplicated(res$TF), ]
+    rownames(res) <- res$TF
 
-homer.res.Group1 <- fread("homer/Group_1/knownResults.txt",
-    header = TRUE
+    anno <- read.csv("homer/motif.anno.csv", header = TRUE)
+    rownames(anno) <- anno$TF
+    res$Family <- anno[res$TF, "Anno"]
+
+    # res <- res[order(res$log.p.value, decreasing = TRUE), ]
+    # res <- res[!duplicated(res$Family), ]
+
+    res$Diff <- "none"
+    res$Diff[res$Log2_Enrichment >= log2.enrichment & res$log.p.value >= log.p.value] <- "up"
+    return(res)
+}
+
+homer.res <- list(
+    "Group_1" = homer.parser("homer/Group_1/knownResults.txt") %>%
+        mutate(Group = "Group_1"),
+    "Group_2" = homer.parser("homer/Group_2/knownResults.txt") %>%
+        mutate(Group = "Group_2"),
+    "Common" = homer.parser("homer/Common/knownResults.txt") %>%
+        mutate(Group = "Common")
 )
+sapply(homer.res, dim) # 419 TFs
+identical(homer.res$Group_1$TF, homer.res$Group_2$TF)
+
+pdf("Dot.motif.Group1.pdf", 5, 4)
+ggplot(homer.res$Group_1, aes(x = Log2_Enrichment, y = log.p.value)) +
+    geom_point(aes(color = Diff), size = 1) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
+    geom_hline(yintercept = 50, linetype = "dashed") +
+    scale_color_manual(values = c("none" = "grey", "up" = "red")) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
+    theme_classic()
+dev.off()
+pdf("Dot.motif.Group2.pdf", 5, 4)
+ggplot(homer.res$Group_2, aes(x = Log2_Enrichment, y = log.p.value)) +
+    geom_point(aes(color = Diff), size = 1) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
+    geom_hline(yintercept = 50, linetype = "dashed") +
+    scale_color_manual(values = c("none" = "grey", "up" = "red")) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
+    theme_classic()
+dev.off()
+pdf("Dot.motif.common.pdf", 5, 4)
+ggplot(homer.res$Common, aes(x = Log2_Enrichment, y = log.p.value)) +
+    geom_point(aes(color = Diff), size = 1) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
+    geom_hline(yintercept = 50, linetype = "dashed") +
+    scale_color_manual(values = c("none" = "grey", "up" = "red")) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
+    theme_classic()
+dev.off()
+
+TF.sig <- lapply(homer.res, function(x) {
+    x <- x[x$Diff == "up", ]
+    return(x$TF)
+}) %>%
+    do.call(c, .) %>%
+    unname() %>%
+    unique()
+TF.sig <- grep(":|-", TF.sig, invert = TRUE, value = TRUE)
+TF.sig <- c("AP-1", TF.sig)
+
+FC.mat <- data.frame(
+    row.names = homer.res$Group_1$TF,
+    "Group_1" = homer.res$Group_1$Log2_Enrichment,
+    "Common" = homer.res$Common$Log2_Enrichment,
+    "Group_2" = homer.res$Group_2$Log2_Enrichment
+)
+
+pdf("Heatmap.motif.sig.pdf", 10, 4)
+pheatmap(t(FC.mat[TF.sig, ]),
+    scale = "column",
+    cluster_rows = FALSE, clustering_method = "ward.D2"
+)
+dev.off()
+
+# sort by Order
+p <- pheatmap(t(FC.mat[TF.sig, ]),
+    scale = "column",
+    cluster_rows = FALSE, clustering_method = "ward.D2"
+)
+TF.sig <- TF.sig[p$tree_col$order]
+
+plot.data <- lapply(homer.res, function(x) {
+    x <- x[x$TF %in% TF.sig, ]
+    return(x)
+}) %>% do.call(rbind, .)
+
+plot.data$Group <- factor(plot.data$Group, levels = c("Group_1", "Common", "Group_2"))
+plot.data$TF <- factor(plot.data$TF, levels = TF.sig)
+
+plot.data[plot.data$log.p.value > 2000, ]$log.p.value <- 2000
+plot.data[plot.data$Log2_Enrichment > 2, ]$Log2_Enrichment <- 2
+
+pdf("Dot.motif.sig.pdf", 5, 7)
+ggplot(plot.data) +
+    geom_point(aes(
+        x = Group, y = TF,
+        fill = log.p.value, size = Log2_Enrichment
+    ), pch = 21) +
+    scale_fill_viridis_c() +
+    theme_bw()
+dev.off()
+
 
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 save.image("Epi_Molecular_Subtype.RData")
+
