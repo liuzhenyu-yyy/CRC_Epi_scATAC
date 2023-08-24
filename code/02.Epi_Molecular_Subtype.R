@@ -498,7 +498,7 @@ for (one in c("Group_1", "Group_2")) {
     pv <- plotMarkers(
         seMarker = marker.peak.vs.Normal,
         name = c(one),
-        cutOff = "FDR <= 0.01 & abs(Log2_Enrichment) >= 1",
+        cutOff = "FDR <= 0.01 & abs(Log2FC) >= 1",
         plotAs = "Volcano"
     )
     pdf(paste("Volcano.markers.", one, ".pdf", sep = ""), 5, 4)
@@ -520,10 +520,10 @@ rownames(marker.peak.vs.Normal) <- paste0("f", rownames(marker.peak.vs.Normal))
 colnames(marker.peak.vs.Normal)
 
 temp <- marker.peak.vs.Normal@assays@data
-peak.G1.up <- rownames(marker.peak.vs.Normal)[temp$Log2_Enrichment[, 1] >= 1 & temp$FDR[, 1] <= 0.01]
-peak.G1.down <- rownames(marker.peak.vs.Normal)[temp$Log2_Enrichment[, 1] <= (-1) & temp$FDR[, 1] <= 0.01]
-peak.G2.up <- rownames(marker.peak.vs.Normal)[temp$Log2_Enrichment[, 2] >= 1 & temp$FDR[, 2] <= 0.01]
-peak.G2.down <- rownames(marker.peak.vs.Normal)[temp$Log2_Enrichment[, 2] <= (-1) & temp$FDR[, 2] <= 0.01]
+peak.G1.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 1] >= 1 & temp$FDR[, 1] <= 0.01]
+peak.G1.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 1] <= (-1) & temp$FDR[, 1] <= 0.01]
+peak.G2.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] >= 1 & temp$FDR[, 2] <= 0.01]
+peak.G2.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] <= (-1) & temp$FDR[, 2] <= 0.01]
 rm(temp)
 
 pdf("Upset.markers.group_vs_normal.pdf", 7, 4.5)
@@ -692,7 +692,7 @@ rm(plot.data)
 # export bed files
 dir.create("bed")
 # marker.peak.tumor.gr <- getMarkers(marker.peak.vs.Normal,
-#     cutOff = "FDR <= 0.01 & Log2_Enrichment >= 1",
+#     cutOff = "FDR <= 0.01 & Log2FC >= 1",
 #     returnGR = TRUE
 # )
 # lapply(marker.peak.tumor.gr, length)
@@ -769,6 +769,7 @@ write.table(
 rm(gene, marker.peak.tumor.gr, p, track.subtype)
 
 # 5. TF enrichment in marker peaks ----
+dir.create("TF_motif")
 ## 5.1. run HOMER ----
 # findMotifsGenome.pl bed/marker.peak.tumor.Group_1.specific.bed hg38 homer/Group_1 -size 200
 homer.parser <- function(res, log.p.value = 50, log2.enrichment = 1) {
@@ -816,7 +817,8 @@ homer.res <- list(
 sapply(homer.res, dim) # 419 TFs
 identical(homer.res$Group_1$TF, homer.res$Group_2$TF)
 
-pdf("Dot.motif.Group1.pdf", 5, 4)
+## 5.2. identify significant TFs ----
+pdf("TF_motif/Dot.motif.Group1.pdf", 5, 4)
 ggplot(homer.res$Group_1, aes(x = Log2_Enrichment, y = log.p.value)) +
     geom_point(aes(color = Diff), size = 1) +
     geom_vline(xintercept = 1, linetype = "dashed") +
@@ -825,7 +827,7 @@ ggplot(homer.res$Group_1, aes(x = Log2_Enrichment, y = log.p.value)) +
     ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
     theme_classic()
 dev.off()
-pdf("Dot.motif.Group2.pdf", 5, 4)
+pdf("TF_motif/Dot.motif.Group2.pdf", 5, 4)
 ggplot(homer.res$Group_2, aes(x = Log2_Enrichment, y = log.p.value)) +
     geom_point(aes(color = Diff), size = 1) +
     geom_vline(xintercept = 1, linetype = "dashed") +
@@ -834,7 +836,7 @@ ggplot(homer.res$Group_2, aes(x = Log2_Enrichment, y = log.p.value)) +
     ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
     theme_classic()
 dev.off()
-pdf("Dot.motif.common.pdf", 5, 4)
+pdf("TF_motif/Dot.motif.common.pdf", 5, 4)
 ggplot(homer.res$Common, aes(x = Log2_Enrichment, y = log.p.value)) +
     geom_point(aes(color = Diff), size = 1) +
     geom_vline(xintercept = 1, linetype = "dashed") +
@@ -861,7 +863,7 @@ FC.mat <- data.frame(
     "Group_2" = homer.res$Group_2$Log2_Enrichment
 )
 
-pdf("Heatmap.motif.sig.pdf", 10, 4)
+pdf("TF_motif/Heatmap.motif.sig.pdf", 10, 4)
 pheatmap(t(FC.mat[TF.sig, ]),
     scale = "column",
     cluster_rows = FALSE, clustering_method = "ward.D2"
@@ -886,7 +888,7 @@ plot.data$TF <- factor(plot.data$TF, levels = TF.sig)
 plot.data[plot.data$log.p.value > 2000, ]$log.p.value <- 2000
 plot.data[plot.data$Log2_Enrichment > 2, ]$Log2_Enrichment <- 2
 
-pdf("Dot.motif.sig.pdf", 5, 7)
+pdf("TF_motif/Dot.motif.sig.pdf", 5, 7)
 ggplot(plot.data) +
     geom_point(aes(
         x = Group, y = TF,
@@ -896,6 +898,109 @@ ggplot(plot.data) +
     theme_bw()
 dev.off()
 
+## 5.3. combine with Motif deviation & gene score ----
+table(proj_Epi$Epi_Group)
+# marker of motif deviation
+marker.motif.vs.Normal <- getMarkerFeatures(
+    ArchRProj = proj_Epi,
+    useMatrix = "MotifMatrix",
+    groupBy = "Epi_Group",
+    useGroups = c("Group_1", "Group_2"),
+    bgdGroups = "Normal"
+)
+
+marker.motif <- getMarkers(marker.motif.vs.Normal,
+    cutOff = "FDR <= 0.01 & MeanDiff > 0.05"
+) %>% lapply(., as.data.frame)
+marker.motif$Group_1
+
+TF.CISBP <- getFeatures(proj_Epi, useMatrix = "MotifMatrix")
+
+# align CISBP and HOMER
+TF.sig.align <- sapply(TF.sig, function(x) {
+    res <- paste("z:", x, sep = "")
+    res <- grep(res, TF.CISBP, value = TRUE)
+    return(res)
+})  %>% unlist()
+names(TF.sig.align) <- TF.sig.align %>%
+    gsub("z:", "", .) %>%
+    gsub("_.+?$", "", .)
+sapply(TF.sig, function(x) {
+    res <- paste("z:", x, sep = "")
+    res <- grep(res, TF.CISBP, value = TRUE)
+    return(res)
+})["NRF2"]
+
+# plot gene score
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "GeneScoreMatrix",
+    name = names(TF.sig.align), embedding = "UMAP",
+    imputeWeights = getImputeWeights(proj_Epi),
+    size = 0.2, plotAs = "points"
+)
+pdf("TF_motif/UMAP.TF.sig.GeneScore.pdf", 5, 5)
+for (one in p) {
+    plot(one)
+}
+dev.off()
+
+# plot deviation
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "MotifMatrix",
+    name = TF.sig.align, embedding = "UMAP",
+    imputeWeights = getImputeWeights(proj_Epi),
+    size = 0.2, plotAs = "points"
+)
+pdf("TF_motif/UMAP.TF.sig.MotifZ.pdf", 5, 5)
+for (one in p) {
+    plot(one)
+}
+dev.off()
+rm(p, one, TF.CISBP)
+
+## 5.4.select for visulization ----
+# selected for visulization (combine with gene score matrix)
+
+c("TCF7", "TCF7L2", "LEF1", "", "", "", "", "", "", "", "", "")
+
+TF.selected <- c(
+    "ELF3", "EHF", "ELK4", "GABPA", "FLI1",
+    "FOXM1", "MAFK", "FOXA3",
+    "AP-1", "FOS", "JUNB", "P53", "LEF1", "TCF3",
+    "CDX2", "PPARA", "TR4", "HNF4A", "CTCF"
+)
+
+pdf("TF_motif/Heatmap.motif.sig.selected.pdf", 10, 4)
+pheatmap(t(FC.mat[TF.selected, ]),
+    cluster_cols = FALSE,
+    scale = "column",
+    cluster_rows = FALSE
+)
+dev.off()
+
+TF.selected <- setdiff(TF.selected, "CTCF")
+plot.data <- lapply(homer.res, function(x) {
+    x <- x[x$TF %in% TF.selected, ]
+    return(x)
+}) %>% do.call(rbind, .)
+
+plot.data$Group <- factor(plot.data$Group, levels = c("Group_1", "Common", "Group_2"))
+plot.data$TF <- factor(plot.data$TF, levels = rev(TF.selected))
+
+plot.data[plot.data$log.p.value > 1000, ]$log.p.value <- 1000
+plot.data[plot.data$Log2_Enrichment > 3, ]$Log2_Enrichment <- 3
+
+pdf("TF_motif/Dot.motif.sig.selected.pdf", 4, 5)
+ggplot(plot.data) +
+    geom_point(aes(
+        x = Group, y = TF,
+        fill = log.p.value, size = Log2_Enrichment
+    ), pch = 21) +
+    scale_fill_viridis_c() +
+    theme_bw()
+dev.off()
+
+rm(FC.mat, plot.data)
 
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 save.image("Epi_Molecular_Subtype.RData")
