@@ -959,14 +959,11 @@ dev.off()
 rm(p, one, TF.CISBP)
 
 ## 5.4.select for visulization ----
-# selected for visulization (combine with gene score matrix)
-
-c("TCF7", "TCF7L2", "LEF1", "", "", "", "", "", "", "", "", "")
-
+# dot plot for TFs
 TF.selected <- c(
-    "ELF3", "EHF", "ELK4", "GABPA", "FLI1",
+    "ELF1", "EHF", "ETS1",
     "FOXM1", "MAFK", "FOXA3",
-    "AP-1", "FOS", "JUNB", "P53", "LEF1", "TCF3",
+    "AP-1", "P53", "LEF1", "TCF3",
     "CDX2", "PPARA", "TR4", "HNF4A", "CTCF"
 )
 
@@ -988,9 +985,9 @@ plot.data$Group <- factor(plot.data$Group, levels = c("Group_1", "Common", "Grou
 plot.data$TF <- factor(plot.data$TF, levels = rev(TF.selected))
 
 plot.data[plot.data$log.p.value > 1000, ]$log.p.value <- 1000
-plot.data[plot.data$Log2_Enrichment > 3, ]$Log2_Enrichment <- 3
+#plot.data[plot.data$Log2_Enrichment > 3, ]$Log2_Enrichment <- 3
 
-pdf("TF_motif/Dot.motif.sig.selected.pdf", 4, 5)
+pdf("TF_motif/Dot.motif.sig.selected1.pdf", 4, 4)
 ggplot(plot.data) +
     geom_point(aes(
         x = Group, y = TF,
@@ -1001,6 +998,59 @@ ggplot(plot.data) +
 dev.off()
 
 rm(FC.mat, plot.data)
+
+# umap
+TF.selected <- TF.sig.align[c("MAFK", "FOXA3", "LEF1", "TCF3", "PPARA", "HNF4A")]
+p1 <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "GeneScoreMatrix",
+    name = names(TF.selected), embedding = "UMAP",
+    imputeWeights = getImputeWeights(proj_Epi),
+    size = 0.2, plotAs = "points"
+)
+p2 <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "MotifMatrix",
+    name = TF.selected, embedding = "UMAP",
+    imputeWeights = getImputeWeights(proj_Epi),
+    size = 0.2, plotAs = "points"
+)
+pdf("TF_motif/UMAP.TF.sig.selected.pdf", 30, 14)
+wrap_plots(c(p1, p2), ncol = 6)
+dev.off()
+rm(p1, p2)
+
+# footprint
+# temp <- readRDS(file.path(project.dir.epi, "Save-ArchR-Project_raw.rds"))
+# temp@peakAnnotation$Motif$Positions <- paste0(project.dir.epi, "/Annotations/Motif-Positions-In-Peaks.rds")
+# temp@peakAnnotation$Motif$Matches <- paste0(project.dir.epi, "/Annotations/Motif-Matches-In-Peaks.rds")
+# proj_Epi@peakAnnotation <- temp@peakAnnotation
+# rm(temp)
+
+motifPositions <- getPositions(proj_Epi)
+
+proj_Epi <- addGroupCoverages(
+    ArchRProj = proj_Epi,
+    groupBy = "Epi_Group"
+)
+
+seFoot <- getFootprints(
+    ArchRProj = proj_Epi,
+    positions = motifPositions[gsub("z:", "", TF.selected)],
+    groupBy = "Epi_Group",
+    useGroups = c("Group_1", "Group_2"),
+)
+
+plotFootprints(
+    seFoot = seFoot,
+    ArchRProj = proj_Epi,
+    normMethod = "Subtract",
+    addDOC = FALSE,
+    plotName = "Plot-Footprints-Subtract.sw10.pdf",
+    pal = mycolor$Epi_Group,
+    smoothWindow = 10
+)
+
+?plotFootprints
+rm(motifPositions, seFoot)
 
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 save.image("Epi_Molecular_Subtype.RData")
