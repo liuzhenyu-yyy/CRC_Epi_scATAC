@@ -245,7 +245,9 @@ pdf("UAMP.Epi.Epi_Group.pdf", 7, 7)
 plot(p)
 dev.off()
 
-## 2.3. visualize NMF results ----
+saveRDS(cluster.info, "cluster.info.rds")
+
+## 2.2. visualize NMF results ----
 # conseusus matrix
 con.mat <- NMF.res@consensus
 sil <- silhouette(NMF.res, what = "consensus")

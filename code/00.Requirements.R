@@ -15,6 +15,7 @@ if (TRUE) {
     library(patchwork)
     library(pheatmap)
     library(viridis)
+    library(Vennerable)
 }
 
 if (TRUE) {
