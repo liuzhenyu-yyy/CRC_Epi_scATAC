@@ -88,6 +88,52 @@ mycolor <- list(
     )
 )
 
+# cell type level ----
+sePeaks.epi.type <- getGroupSE(
+    ArchRProj = proj_Epi,
+    useMatrix = "PeakMatrix",
+    groupBy = "Epi_type",
+    divideN = TRUE,
+    scaleTo = NULL
+)
+rownames(sePeaks.epi.type) <- paste(rowData(sePeaks.epi.type)$seqnames,
+    rowData(sePeaks.epi.type)$start,
+    rowData(sePeaks.epi.type)$end,
+    sep = "_"
+)
+rownames(sePeaks.epi.type@assays@data$PeakMatrix) <- rownames(sePeaks.epi.type)
+peakmat.type <- sePeaks.epi.type@assays@data$PeakMatrix
+peakmat.type <- peakmat.type[c(diff_peaks$AD_vs_NA$Up$peak_id, diff_peaks$AD_vs_NA$Down$peak_id), ]
+peakmat.type <- peakmat.type[!duplicated(rownames(peakmat.type)), ]
+
+anno.row <- data.frame(
+    row.names = rownames(peakmat.type),
+    peak = rep("Down", length(rownames(peakmat.type)))
+)
+anno.row[diff_peaks$AD_vs_NA$Up$peak_id, "peak"] <- "Up"
+table(anno.row$peak)
+
+anno.col <- data.frame(
+    row.names = c("Normal", "Adenoma", "Malignant"),
+    Epi_type = c("Normal", "Adenoma", "Malignant")
+)
+mycolor$peak <- c("Up" = "#cd2525", "Down" = "#1774cd")
+
+pdf("Heatmap.AD_vs_NA.all.type.pdf", 5.5, 6)
+pheatmap(peakmat.type,
+    scale = "row",
+    show_rownames = FALSE,
+    clustering_method = "ward.D2",
+    cluster_cols = TRUE,
+    cluster_rows = TRUE,
+    annotation_col = anno.col,
+    annotation_row = anno.row,
+    annotation_colors = mycolor
+)
+dev.off()
+rm(anno.col, anno.row, sePeaks.epi.type)
+
+# cluster level ----
 sePeaks <- getGroupSE(
     ArchRProj = proj_Epi,
     useMatrix = "PeakMatrix",
@@ -124,7 +170,6 @@ rm(temp, sePeaks)
 
 anno.col <- cluster.info %>% select(c("Epi_type", "Epi_Group"))
 
-# up peak
 plot.data <- peakmat.cluster[diff_peaks$AD_vs_NA$Up$peak_id, ]
 plot.data <- plot.data[, order(cluster.info$Epi_Group)]
 
@@ -139,7 +184,6 @@ pheatmap(plot.data,
 )
 dev.off()
 
-# down peak
 plot.data <- peakmat.cluster[diff_peaks$AD_vs_NA$Down$peak_id, ]
 plot.data <- plot.data[, order(cluster.info$Epi_Group)]
 
@@ -276,7 +320,12 @@ rm(plot.data)
 #     theme_classic()
 # dev.off()
 
-
 # 3. correlation of diff peak and methylation ----
+load("Methylation_data/methylation.rda")
+
+## 3.1. average of all peaks ----
+
+
+
 
 save.image("03.Epi_AD_Methylation.RData")
