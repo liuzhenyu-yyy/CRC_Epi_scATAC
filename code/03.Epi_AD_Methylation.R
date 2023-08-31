@@ -178,7 +178,7 @@ cluster.info$Epi_type <- factor(cluster.info$Epi_type,
     levels = c("Normal", "Adenoma", "Malignant")
 )
 
-cluster.info$Epi_Group <- cluster.info$Epi_type
+cluster.info$Epi_Group <- cluster.info$Epi_type %>% as.character()
 cluster.info[rownames(temp), ]$Epi_Group <- temp$Epi_Group
 cluster.info$Epi_Group <- factor(cluster.info$Epi_Group,
     levels = c("Normal", "Adenoma", "Group_1", "Group_2")
