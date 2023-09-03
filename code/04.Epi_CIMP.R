@@ -1,5 +1,5 @@
 setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/04.Epi_CIMP")
-
+load("04.Epi_CIMP.RData")
 source("../../code/00.Requirements.R")
 
 # 1. Calculate ATAC-CGI matrix ----
@@ -68,7 +68,10 @@ mycolor <- list(
         "Normal" = "#208a42", "Adenoma" = "#d51f26",
         "Group_1" = "#62b7e6", "Group_2" = "#283891"
     ),
-    "CIMP_Group" = c("CIMP_High" = "#59b891", "CIMP_Low" = "#fa774f", "CIMP_Negative" = "#7a8dbf")
+    "CIMP_Group" = c(
+        "Normal" = "#208a42", "Adenoma" = "#d51f26",
+        "CIMP_High" = "#59b891", "CIMP_Low" = "#fa774f", "CIMP_Negative" = "#7a8dbf"
+    )
 )
 
 ## 2.1. cluster by marker signal ----
@@ -222,6 +225,41 @@ for (i in 1:3) {
 dev.off()
 rm(p.list, i, one, temp)
 
+# 3. find markers for all groups ----
+table(proj_Epi$CIMP_Group, proj_Epi$Epi_Group)
 
+markersPeaks.CIMP <- getMarkerFeatures(
+    ArchRProj = proj_Epi,
+    useMatrix = "PeakMatrix",
+    groupBy = "CIMP_Group",
+    testMethod = "wilcoxon",
+    bias = c("TSSEnrichment", "log10(nFrags)"),
+    useGroups = c("CIMP_High", "CIMP_Low", "CIMP_Negative"),
+    bgdGroups = "Normal"
+)
+heatmapPeaks <- plotMarkerHeatmap(
+    seMarker = markersPeaks.CIMP,
+    cutOff = "FDR <= 0.01 & Log2FC>= 1"
+)
+
+pdf("Heatmap.CIMP.marker.peaks.pdf", 6, 5)
+plot(heatmapPeaks)
+dev.off()
+rm(heatmapPeaks)
+
+# volcano plot
+for (one in c("CIMP_High", "CIMP_Low", "CIMP_Negative")) {
+    message(paste("plot markers Volcano for ", one, " ...", sep = ""))
+    pv <- plotMarkers(
+        seMarker = markersPeaks.CIMP,
+        name = c(one),
+        cutOff = "FDR <= 0.01 & abs(Log2FC) >= 1",
+        plotAs = "Volcano"
+    )
+    pdf(paste("Volcano.markers.", one, ".pdf", sep = ""), 5, 4)
+    plot(pv)
+    dev.off()
+    rm(pv, one)
+}
 
 save.image("04.Epi_CIMP.RData")
