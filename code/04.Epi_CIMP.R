@@ -225,7 +225,36 @@ for (i in 1:3) {
 dev.off()
 rm(p.list, i, one, temp)
 
+## 2.4. compare with molecular subtypes ----
+plot.data <- table(proj_Epi$Epi_Group, proj_Epi$CIMP_Group) %>%
+    as.data.frame()
+plot.data <- plot.data %>%
+    filter(Var1 != "Normal" & Var1 != "Adenoma") %>%
+    filter(Var2 != "Normal" & Var2 != "Adenoma")
+
+plot.data$Pct <- plot.data$Freq / table(proj_Epi$Epi_Group)[plot.data$Var1] * 100
+plot.data$Pct <- round(plot.data$Pct, 1) %>%
+    paste0("%")
+
+pdf("Bar.CIMP.vs.CMS.pdf", 5, 2)
+ggplot(plot.data) +
+    geom_bar(aes(x = Var1, y = Freq, fill = Var2),
+        stat = "identity", position = position_fill(reverse = TRUE)
+    ) +
+    geom_text(aes(x = Var1, y = Freq, label = Pct),
+        size = 3,
+        position = position_fill(vjust = 0.5)
+    ) +
+    xlab("Peak type") +
+    ylab("Percent of peaks") +
+    coord_flip() +
+    scale_fill_manual(values = mycolor$CIMP_Group) +
+    theme_classic() +
+    theme(axis.title = element_blank())
+dev.off()
+
 # 3. find markers for all groups ----
+## 3.1. identify diff peaks of each cluster ----
 table(proj_Epi$CIMP_Group, proj_Epi$Epi_Group)
 
 markersPeaks.CIMP <- getMarkerFeatures(
@@ -237,9 +266,12 @@ markersPeaks.CIMP <- getMarkerFeatures(
     useGroups = c("CIMP_High", "CIMP_Low", "CIMP_Negative"),
     bgdGroups = "Normal"
 )
+saveRDS(markersPeaks.CIMP, "markersPeaks.CIMP.rds")
+
 heatmapPeaks <- plotMarkerHeatmap(
     seMarker = markersPeaks.CIMP,
-    cutOff = "FDR <= 0.01 & Log2FC>= 1"
+    cutOff = "FDR <= 0.01 & Log2FC>= 1",
+    labelMarkers = c()
 )
 
 pdf("Heatmap.CIMP.marker.peaks.pdf", 6, 5)
@@ -262,4 +294,377 @@ for (one in c("CIMP_High", "CIMP_Low", "CIMP_Negative")) {
     rm(pv, one)
 }
 
+## 3.2. location distribution ----
+peakset <- proj_Epi@peakSet
+names(peakset) <- paste(
+    seqnames(peakset), start(peakset), end(peakset),
+    sep = "_"
+)
+quantile(peakset$distToTSS, probs = seq(0, 1, 0.1))
+
+marker.peak.up.list <- getMarkers(markersPeaks.CIMP,
+    cutOff = "FDR <= 0.01 & Log2FC >= 1"
+) %>% lapply(function(x) {
+    x <- x %>%
+        as.data.frame() %>%
+        mutate(
+            peak_id = paste(seqnames, start, end, sep = "_")
+        )
+    return(peakset[x$peak_id])
+})
+
+marker.peak.down.list <- getMarkers(markersPeaks.CIMP,
+    cutOff = "FDR <= 0.01 & Log2FC <= -1"
+) %>% lapply(function(x) {
+    x <- x %>%
+        as.data.frame() %>%
+        mutate(
+            peak_id = paste(seqnames, start, end, sep = "_")
+        )
+    return(peakset[x$peak_id])
+})
+
+lapply(marker.peak.down.list, length)
+
+for (one in c("CIMP_High", "CIMP_Low", "CIMP_Negative")) {
+    plot.data1 <- table(marker.peak.up.list[[one]]$peakType) %>%
+        as.data.frame() %>%
+        mutate("Group" = "Up")
+    plot.data1$Pct <- plot.data1$Freq / sum(plot.data1$Freq) * 100
+    plot.data2 <- table(marker.peak.down.list[[one]]$peakType) %>%
+        as.data.frame() %>%
+        mutate("Group" = "Down")
+    plot.data2$Pct <- plot.data2$Freq / sum(plot.data2$Freq) * 100
+
+    plot.data <- rbind(plot.data1, plot.data2)
+    plot.data$Pct <- round(plot.data$Pct, 1) %>%
+        paste0("%")
+
+    pdf(paste0("Bar.marker.peakType", one, ".pdf"), 5, 2)
+    p <- ggplot(plot.data) +
+        geom_bar(aes(x = Group, y = Freq, fill = Var1),
+            stat = "identity", position = position_fill(reverse = TRUE)
+        ) +
+        geom_text(aes(x = Group, y = Freq, label = Pct),
+            size = 3,
+            position = position_fill(vjust = 0.5)
+        ) +
+        xlab("Peak type") +
+        ylab("Percent of peaks") +
+        coord_flip() +
+        scale_fill_manual(values = c(
+            "Distal" = "#59b795", "Exonic" = "#f8784f",
+            "Intronic" = "#7a8dbf", "Promoter" = "#df73b7"
+        )) +
+        theme_classic() +
+        theme(axis.title = element_blank())
+    plot(p)
+    dev.off()
+}
+rm(one, p, plot.data, plot.data1, plot.data2, peakset)
+
+## 3.3. functional enrichment ----
+marker.peak2gene.list <- lapply(
+    marker.peak.list,
+    function(x) {
+        peakset[x$peak_id] %>%
+            subset(distToTSS < 5e4) %>%
+            .$nearestGene %>%
+            unique()
+    }
+)
+lapply(marker.peak2gene.list, length) # 6422 9698 8446
+
+pdf("Upset.markers.group_vs_normal.pdf", 7, 4.5)
+upset(
+    fromList(marker.peak2gene.list),
+    nset = 3,
+    order.by = "freq"
+)
+dev.off()
+
+library(clusterProfiler)
+GO.marker.list <- lapply(
+    marker.peak2gene.list,
+    function(x) {
+        res <- clusterProfiler::enrichGO(x,
+            OrgDb = org.Hs.eg.db,
+            keyType = "SYMBOL",
+            ont = "BP",
+            pAdjustMethod = "BH"
+        )
+        res <- clusterProfiler::simplify(res)
+        return(res@result)
+    }
+)
+write.csv(GO.marker.list$CIMP_High, "GO.marker.CIMP_High.csv")
+write.csv(GO.marker.list$CIMP_Low, "GO.marker.CIMP_Low.csv")
+write.csv(GO.marker.list$CIMP_Negative, "GO.marker.CIMP_Negative.csv")
+
+# no good results
+rm(GO.marker.list, marker.peak2gene.list)
+
+# 4. motif analysis of each subtype ----
+dir.create("homer")
+dir.create("bed")
+
+write.table(
+    names(marker.peak.up.list$CIMP_High) %>%
+        gsub("_", "\t", .) %>%
+        as.data.frame() %>%
+        mutate(
+            "Name" = names(marker.peak.up.list$CIMP_High),
+            "length" = 500,
+            "strand" = "."
+        ),
+    "bed/marker.peak.tumor.CIMP_High.bed",
+    col.names = FALSE,
+    sep = "\t", quote = FALSE, row.names = FALSE
+)
+write.table(
+    names(marker.peak.up.list$CIMP_Low) %>%
+        gsub("_", "\t", .) %>%
+        as.data.frame() %>%
+        mutate(
+            "Name" = names(marker.peak.up.list$CIMP_Low),
+            "length" = 500,
+            "strand" = "."
+        ),
+    "bed/marker.peak.tumor.CIMP_Low.bed",
+    col.names = FALSE,
+    sep = "\t", quote = FALSE, row.names = FALSE
+)
+write.table(
+    names(marker.peak.up.list$CIMP_Negative) %>%
+        gsub("_", "\t", .) %>%
+        as.data.frame() %>%
+        mutate(
+            "Name" = names(marker.peak.up.list$CIMP_Negative),
+            "length" = 500,
+            "strand" = "."
+        ),
+    "bed/marker.peak.tumor.CIMP_Negative.bed",
+    col.names = FALSE,
+    sep = "\t", quote = FALSE, row.names = FALSE
+)
+
+## 4.1. run HOMER ----
+# nohup findMotifsGenome.pl bed/marker.peak.tumor.CIMP_High.bed hg38 homer/CIMP_High -size 200
+# nohup findMotifsGenome.pl bed/marker.peak.tumor.CIMP_Low.bed hg38 homer/CIMP_Low -size 200
+# nohup findMotifsGenome.pl bed/marker.peak.tumor.CIMP_Negative.bed hg38 homer/CIMP_Negative -size 200
+
+homer.res <- list(
+    "CIMP_High" = homer.parser("homer/CIMP_High/knownResults.txt") %>%
+        mutate(Group = "CIMP_High"),
+    "CIMP_Low" = homer.parser("homer/CIMP_Low/knownResults.txt") %>%
+        mutate(Group = "CIMP_Low"),
+    "CIMP_Negative" = homer.parser("homer/CIMP_Negative/knownResults.txt") %>%
+        mutate(Group = "CIMP_Negative")
+)
+
+sapply(homer.res, dim) # 419 TFs
+identical(homer.res$CIMP_High$TF, homer.res$CIMP_Low$TF)
+
+## 4.2. identify significant TFs ----
+dir.create("TF_motif")
+pdf("TF_motif/Dot.motif.CIMP_High.pdf", 5, 4)
+ggplot(homer.res$CIMP_High, aes(x = Log2_Enrichment, y = log.p.value)) +
+    geom_point(aes(color = Diff), size = 1) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
+    geom_hline(yintercept = 50, linetype = "dashed") +
+    scale_color_manual(values = c("none" = "grey", "up" = "red")) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
+    theme_classic()
+dev.off()
+pdf("TF_motif/Dot.motif.CIMP_Low.pdf", 5, 4)
+ggplot(homer.res$CIMP_Low, aes(x = Log2_Enrichment, y = log.p.value)) +
+    geom_point(aes(color = Diff), size = 1) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
+    geom_hline(yintercept = 50, linetype = "dashed") +
+    scale_color_manual(values = c("none" = "grey", "up" = "red")) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
+    theme_classic()
+dev.off()
+pdf("TF_motif/Dot.motif.CIMP_Negative.pdf", 5, 4)
+ggplot(homer.res$CIMP_Negative, aes(x = Log2_Enrichment, y = log.p.value)) +
+    geom_point(aes(color = Diff), size = 1) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
+    geom_hline(yintercept = 50, linetype = "dashed") +
+    scale_color_manual(values = c("none" = "grey", "up" = "red")) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
+    theme_classic()
+dev.off()
+
+TF.sig <- lapply(homer.res, function(x) {
+    x <- x[x$Diff == "up", ]
+    return(x$TF)
+}) %>%
+    do.call(c, .) %>%
+    unname() %>%
+    unique()
+TF.sig <- grep(":|-", TF.sig, invert = TRUE, value = TRUE)
+TF.sig <- c("AP-1", TF.sig)
+
+FC.mat <- data.frame(
+    row.names = homer.res$CIMP_High$TF,
+    "CIMP_High" = homer.res$CIMP_High$Log2_Enrichment,
+    "CIMP_Low" = homer.res$CIMP_Low$Log2_Enrichment,
+    "CIMP_Negative" = homer.res$CIMP_Negative$Log2_Enrichment
+)
+
+pdf("TF_motif/Heatmap.motif.sig.pdf", 10, 4)
+p <- pheatmap::pheatmap(t(FC.mat[TF.sig, ]),
+    scale = "column",
+    cluster_rows = FALSE,
+    clustering_method = "ward.D2",
+    cutree_cols = 4
+)
+dev.off()
+
+## 4.3. visulize CIMP_High specific ----
+# dot plot
+TF.selected <- cutree(p$tree_col, 4) %>%
+    .[. == 2] %>%
+    names()
+
+plot.data <- lapply(homer.res, function(x) {
+    x <- x[x$TF %in% TF.selected, ]
+    return(x)
+}) %>% do.call(rbind, .)
+
+plot.data$Group <- factor(plot.data$Group, levels = c("CIMP_High", "CIMP_Low", "CIMP_Negative"))
+plot.data$TF <- factor(plot.data$TF, levels = rev(TF.selected))
+plot.data[plot.data$log.p.value > 1000, ]$log.p.value <- 1000
+
+pdf("TF_motif/Dot.motif.sig.CIMP_High.pdf", 3.5, 3.5)
+ggplot(plot.data) +
+    geom_point(aes(
+        x = Group, y = TF,
+        fill = log.p.value, size = Log2_Enrichment
+    ), pch = 21) +
+    scale_fill_viridis_c() +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+dev.off()
+
+rm(FC.mat, plot.data, p)
+
+# umap
+TF.CISBP <- getFeatures(proj_Epi, useMatrix = "MotifMatrix")
+grep("TEAD", TF.CISBP, value = TRUE)
+# align CISBP and HOMER
+TF.sig.align <- sapply(TF.sig, function(x) {
+    res <- paste("z:", x, sep = "")
+    res <- grep(res, TF.CISBP, value = TRUE)
+    return(res)
+}) %>%
+    unlist() %>%
+    sort()
+names(TF.sig.align) <- TF.sig.align %>%
+    gsub("z:", "", .) %>%
+    gsub("_.+?$", "", .)
+
+TF.selected <- TF.sig.align[c(TF.selected, "TEAD1")]
+TF.selected <- TF.selected[!is.na(TF.selected)]
+
+p1 <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "GeneScoreMatrix",
+    name = names(TF.selected), embedding = "UMAP",
+    imputeWeights = getImputeWeights(proj_Epi),
+    size = 0.2, plotAs = "points"
+)
+p2 <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "MotifMatrix",
+    name = TF.selected, embedding = "UMAP",
+    imputeWeights = getImputeWeights(proj_Epi),
+    size = 0.2, plotAs = "points"
+)
+pdf("TF_motif/UMAP.TF.sig.CIMP_High.pdf", 40, 14)
+wrap_plots(c(p1, p2), ncol = 8)
+dev.off()
+rm(p1, p2, p)
+
+# footprints
+motifPositions <- getPositions(proj_Epi)
+
+proj_Epi <- addGroupCoverages(
+    ArchRProj = proj_Epi,
+    groupBy = "CIMP_Group"
+)
+
+seFoot <- getFootprints(
+    ArchRProj = proj_Epi,
+    positions = motifPositions[gsub("z:", "", TF.selected)],
+    groupBy = "CIMP_Group",
+    useGroups = c("CIMP_High", "Normal", "CIMP_Negative"),
+)
+
+plotFootprints(
+    seFoot = seFoot,
+    ArchRProj = proj_Epi,
+    normMethod = "Subtract",
+    addDOC = FALSE,
+    plotName = "Footprints_CIMP_Group_Subtract.sw10.pdf",
+    pal = c(mycolor$CIMP_Group, "Normal" = "#208a42"),
+    smoothWindow = 10
+)
+
+## 4.4. positive feedback loop ----
+write.table(
+    names(marker.peak.down.list$CIMP_High) %>%
+        gsub("_", "\t", .) %>%
+        as.data.frame() %>%
+        mutate(
+            "Name" = names(marker.peak.down.list$CIMP_High),
+            "length" = 500,
+            "strand" = "."
+        ),
+    "bed/marker.peak.tumor.CIMP_High.down.bed",
+    col.names = FALSE,
+    sep = "\t", quote = FALSE, row.names = FALSE
+)
+# findMotifsGenome.pl bed/marker.peak.tumor.CIMP_High.down.bed hg38 homer/CIMP_High_down -size 200
+CIMP.H.down.homer <- homer.parser(
+    "homer/CIMP_High_down/knownResults.txt",
+    log.p.value = 50, log2.enrichment = 1
+)
+CIMP.H.down.homer <- CIMP.H.down.homer[CIMP.H.down.homer$TF != "UNKNOWN", ]
+
+CIMP.H.down.homer[CIMP.H.down.homer$Diff != "up", ]$TF <- NA
+CIMP.H.down.homer[CIMP.H.down.homer$Diff != "up", ]$Family <- NA
+
+pdf("TF_motif/Dot.motif.CIMP_High.down.pdf", 5, 4)
+ggplot(CIMP.H.down.homer, aes(x = Log2_Enrichment, y = log.p.value)) +
+    geom_point(aes(color = Family), size = 1) +
+    geom_vline(xintercept = 1, linetype = "dashed") +
+    geom_hline(yintercept = 50, linetype = "dashed") +
+    scale_color_manual(values = brewer.pal(9, "Set3")) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
+    theme_classic()
+dev.off()
+
+CIMP.H.down.motif <- CIMP.H.down.homer %>%
+    filter(Diff == "up") %>%
+    pull(TF)
+CIMP.H.down.motif <- CIMP.H.down.motif[!CIMP.H.down.motif == "UNKNOWN"]
+
+CIMP.H.down.gene <- marker.peak.down.list$CIMP_High %>%
+    subset(peakType == "Promoter") %>%
+    # subset(peakType != "Distal") %>%
+    .$nearestGene %>%
+    unique()
+
+intersect(CIMP.H.down.motif, CIMP.H.down.gene) # "HOXB13" "KLF3"
+
+v <- Venn(list(
+    "PLS" = CIMP.H.down.gene,
+    "TF" = CIMP.H.down.motif
+))
+
+pdf("TF_motif/Venn.PLS.TF.pdf", 4, 4)
+plot(v, doWeights = TRUE, show = list(Faces = FALSE))
+dev.off()
+
+rm(v, motifPositions, TF.CISBP)
+saveRDS(cluster.info, "cluster.info.rds")
 save.image("04.Epi_CIMP.RData")

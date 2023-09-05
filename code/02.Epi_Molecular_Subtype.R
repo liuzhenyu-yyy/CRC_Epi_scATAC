@@ -927,7 +927,7 @@ for (one in p) {
 dev.off()
 rm(p, one, TF.CISBP)
 
-## 5.4.select for visulization ----
+## 5.4. select for visulization ----
 # dot plot for TFs
 TF.selected <- c(
     "ELF1", "EHF", "ETS1",
