@@ -666,5 +666,7 @@ plot(v, doWeights = TRUE, show = list(Faces = FALSE))
 dev.off()
 
 rm(v, motifPositions, TF.CISBP)
+
+proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 saveRDS(cluster.info, "cluster.info.rds")
 save.image("04.Epi_CIMP.RData")
