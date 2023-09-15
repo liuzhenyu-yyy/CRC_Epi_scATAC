@@ -412,12 +412,14 @@ Trait.selected <- c("MSI_Status", "Epi_Group", "CIMP_Group", "CIMP_Group", "MSI_
 
 temp <- table(TF.info$Family) %>%
     sort(decreasing = TRUE) %>%
-    head(11) %>%
-    names()
-temp[temp == "Ets"] <- "Myb/SANT"
-mycolor$TF.Family <- brewer.pal(12, "Set3")[c(1, 3:12)]
-names(mycolor$TF.Family) <- temp
-mycolor$TF.Family["Others"] <- "gray50"
+    head(20) %>%
+    names() %>%
+    gsub("Unknown", "Others", .)
+
+mycolor$TF_Family <- ArchRPalettes$calm[c(1:4, 7, 6, 8:20, 5)]
+names(mycolor$TF_Family) <- temp
+mycolor$TF_Family["Others"] <- "gray50"
+scales::show_col(mycolor$TF_Family)
 
 for (i in seq_along(ME.selected)) {
     gene.selected <- net$colors[net$colors == ME.selected[i]] %>% names()
@@ -436,16 +438,16 @@ for (i in seq_along(ME.selected)) {
     if (sum(is.na(plot.data$Family)) > 0) {
         plot.data[is.na(plot.data$Family), ]$Family <- "Others"
     }
-    if (sum(!plot.data$Family %in% names(mycolor$TF.Family)) > 0) {
-        plot.data[!plot.data$Family %in% names(mycolor$TF.Family), ]$Family <- "Others"
+    if (sum(!plot.data$Family %in% names(mycolor$TF_Family)) > 0) {
+        plot.data[!plot.data$Family %in% names(mycolor$TF_Family), ]$Family <- "Others"
     }
-    plot.data$Family <- factor(plot.data$Family, levels = names(mycolor$TF.Family))
+    plot.data$Family <- factor(plot.data$Family, levels = names(mycolor$TF_Family))
     p <- ggplot(plot.data, aes(x = MM, y = GS)) +
         geom_point(aes(color = Family, size = log10(GeneScore_Malignant))) +
         ggrepel::geom_text_repel(aes(label = Symbol, color = Family),
             size = 2, max.overlaps = 20, point.padding = 1
         ) +
-        scale_color_manual(values = mycolor$TF.Family) +
+        scale_color_manual(values = mycolor$TF_Family) +
             ggpubr::stat_cor() +
             xlab(paste("Gene Module Membership in Module ", ME.selected[i], sep = "")) +
             ylab(paste("Gene Significance for ", Trait.selected[i])) +
@@ -460,7 +462,7 @@ for (i in seq_along(ME.selected)) {
 
 rm(plot.data, p, i, gene.selected, temp)
 
-## 3.4. Vlsualization of the network ----
+# 4. Vlsualization of the network ----
 library("igraph")
 dir.create("Network")
 
@@ -474,44 +476,74 @@ net.meta <- list(
 )
 colnames(net.meta$nodes) <- c("ID", "ME")
 net.meta$nodes <- cbind(net.meta$nodes, TF.info[net.meta$nodes$ID, ])
+net.meta$nodes[!net.meta$nodes$Family %in% names(mycolor$TF_Family), ]$Family <- "Others"
+table(net.meta$nodes$Family)
 
-net.all <- graph_from_data_frame(d = net.meta$links, vertices = net.meta$nodes, directed = FALSE)
+net.all <- graph_from_data_frame(
+    d = net.meta$links,
+    vertices = net.meta$nodes,
+    directed = FALSE
+)
+table(V(net.all)$Family)
 net.all <- simplify(net.all, remove.multiple = FALSE, remove.loops = TRUE)
 
-pdf("Network/Net.pdf", 10, 10)
+V(net.all)$degree <- degree(net.all, mode = "all")
+net.all <- induced_subgraph(net.all,
+    vids = V(net.all)[V(net.all)$degree > 5]
+)
+net.all <- induced_subgraph(net.all,
+    vids = V(net.all)[!is.na(V(net.all)$GeneScore_Malignant)]
+)
+
+l <- layout_with_fr(net.all)
+pdf("Network/Net.all.module.pdf", 10, 10)
 plot(net.all,
-    edge.arrow.size = .2,
-    edge.color = "#bebebe",
-    vertex.color = "#86bdda", vertex.frame.color = "#ffffff",
-    vertex.label.color = "black",
-    vertex.label = gsub("_.+?$", "", V(net.all)$name),
-    layout = layout_with_fr(net.all)
+    edge.color = "gray80",
+    edge.width = E(net.all)$weight * 0.1,
+    vertex.size = log1p(V(net.all)$GeneScore_Malignant) * 1,
+    vertex.color = mycolor$TF_Module[as.character(V(net.all)$Module)],
+    vertex.label = NA,
+    layout = l,
+    main = "All TFs"
+)
+dev.off()
+pdf("Network/Net.all.Family.pdf", 10, 10)
+plot(net.all,
+    edge.color = "gray80",
+    edge.width = E(net.all)$weight * 0.1,
+    vertex.size = log1p(V(net.all)$GeneScore_Malignant) * 1,
+    vertex.color = mycolor$TF_Family[as.character(V(net.all)$Family)],
+    vertex.label = NA,
+    layout = l,
+    main = "All TFs"
 )
 dev.off()
 
-# Generate colors based on media type:
-colrs <- c("gray50", "tomato", "gold")
-V(net.all)$color <- colrs[V(net.all)$media.type]
-
-# Compute node degrees (#links) and use that to set node size:
-deg <- degree(net.all, mode = "all")
-V(net.all)$size <- log(deg) * 2
-# The labels are currently node IDs.
-# Setting them to NA will render no labels:
-V(net.all)$label <- gsub("_.+?$", "", V(net.all)$name)
-
-# Set edge width based on weight:
-E(net.all)$width <- E(net.all)$weight * 6
-
-# change arrow size and edge color:
-E(net.all)$edge.color <- "red"
-
-# We can even set the network layout:
-graph_attr(net.all, "layout") <- layout_with_fr
-
-pdf("Net.pdf", 10, 10)
-plot(net.all)
-dev.off()
-
+for (one in unique(ME.selected)) {
+    net.sub <- induced_subgraph(net.all,
+        vids = V(net.all)[V(net.all)$Module == one]
+    )
+    V(net.sub)$degree <- degree(net.sub, mode = "all")
+    net.sub <- induced_subgraph(net.sub,
+        vids = V(net.sub)[V(net.sub)$degree > 5]
+    )
+    pdf(paste("Network/Net.Module", one, ".Family.pdf", sep = ""), 7, 7)
+    plot(net.sub,
+        edge.color = "gray80",
+        edge.width = E(net.sub)$weight * 0.1,
+        vertex.size = log1p(V(net.sub)$GeneScore_Malignant) * 3,
+        vertex.color = mycolor$TF_Family[as.character(V(net.sub)$Family)],
+        vertex.label.family = "Arial",
+        vertex.label.font = 3,
+        vertex.frame.color = "gray",
+        vertex.label.color = "gray20",
+        vertex.label = V(net.sub)$Symbol,
+        vertex.label.cex = log10(V(net.sub)$GeneScore_Malignant) * 0.3,
+        layout = layout_with_fr(net.sub),
+        main = paste("Module ", one, sep = "")
+    )
+    dev.off()
+}
+rm(net.sub, one)
 
 save.image("05.Epi_TF_Clustering.RData")
