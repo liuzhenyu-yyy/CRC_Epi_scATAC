@@ -235,11 +235,11 @@ plot.data <- data.frame(
 plot.data$Epi_type <- factor(plot.data$Epi_type,
     levels = c("Normal", "Adenoma", "Malignant")
 )
-pdf("Line.Cluster.AD_vs_NA.Up.pdf", 5, 3)
+pdf("Line.Cluster.AD_vs_NA.Up.pdf", 4, 3)
 ggplot(plot.data, aes(x = Epi_type, y = Mean)) +
-    geom_line(aes(group = 1), size = 1) +
+    geom_line(aes(group = 1), size = 1, color = "#cd2525") +
     geom_ribbon(aes(x = 1:3, ymin = Mean - SD, ymax = Mean + SD),
-        alpha = 0.2
+        alpha = 0.2, fill = "#cd2525"
     ) +
     geom_point(aes(color = Epi_type), size = 2, show.legend = FALSE) +
     theme_classic() +
@@ -256,11 +256,11 @@ plot.data <- data.frame(
 plot.data$Epi_type <- factor(plot.data$Epi_type,
     levels = c("Normal", "Adenoma", "Malignant")
 )
-pdf("Line.Cluster.AD_vs_NA.Down.pdf", 5, 3)
+pdf("Line.Cluster.AD_vs_NA.Down.pdf", 4, 3)
 ggplot(plot.data, aes(x = Epi_type, y = Mean)) +
-    geom_line(aes(group = 1), size = 1) +
+    geom_line(aes(group = 1), size = 1, color = "#1774cd") +
     geom_ribbon(aes(x = 1:3, ymin = Mean - SD, ymax = Mean + SD),
-        alpha = 0.2
+        alpha = 0.2, fill = "#1774cd"
     ) +
     geom_point(aes(color = Epi_type), size = 2, show.legend = FALSE) +
     theme_classic() +
@@ -383,11 +383,11 @@ plot.data <- data.frame(
 plot.data$Location <- factor(plot.data$Location,
     levels = c("Normal", "Adenoma", "Malignant")
 )
-pdf("Line.beta.Cluster.AD_vs_NA.Up.pdf", 5, 3)
+pdf("Line.beta.Cluster.AD_vs_NA.Up.pdf", 4, 3)
 ggplot(plot.data, aes(x = Location, y = Mean)) +
-    geom_line(aes(group = 1), size = 1) +
+    geom_line(aes(group = 1), size = 1, color = "#cd2525") +
     geom_ribbon(aes(x = 1:3, ymin = Mean - SD, ymax = Mean + SD),
-        alpha = 0.2
+        alpha = 0.2, fill = "#cd2525"
     ) +
     geom_point(aes(color = Location), size = 2, show.legend = FALSE) +
     theme_classic() +
@@ -404,11 +404,11 @@ plot.data <- data.frame(
 plot.data$Location <- factor(plot.data$Location,
     levels = c("Normal", "Adenoma", "Malignant")
 )
-pdf("Line.beta.Cluster.AD_vs_NA.Down.pdf", 5, 3)
+pdf("Line.beta.Cluster.AD_vs_NA.Down.pdf", 4, 3)
 ggplot(plot.data, aes(x = Location, y = Mean)) +
-    geom_line(aes(group = 1), size = 1) +
+    geom_line(aes(group = 1), size = 1, color = "#1774cd") +
     geom_ribbon(aes(x = 1:3, ymin = Mean - SD, ymax = Mean + SD),
-        alpha = 0.2
+        alpha = 0.2, fill = "#1774cd"
     ) +
     geom_point(aes(color = Location), size = 2, show.legend = FALSE) +
     theme_classic() +
@@ -502,8 +502,8 @@ for (one in gene.selected$gene) {
     plot.data$beta <- betamat.gene.selected[one, ] %>% as.numeric()
 
     p <- ggplot(plot.data, aes(x = Location, y = beta)) +
-        geom_beeswarm(aes(color = Location), cex = 2.5, show.legend = FALSE) +
-        geom_violin(aes(fill = Location), alpha = 0.2, show.legend = FALSE) +
+        geom_quasirandom(aes(color = Location), cex = 1.5, show.legend = FALSE) +
+        # geom_violin(aes(fill = Location), alpha = 0.2, show.legend = FALSE) +
         scale_color_manual(values = mycolor$Epi_type) +
         scale_fill_manual(values = mycolor$Epi_type) +
         ggpubr::stat_compare_means(
@@ -521,7 +521,7 @@ for (one in gene.selected$gene) {
     p.list[[one]] <- p
 }
 
-pdf("Beasworm.AD_vs_NA.selected.gene.pdf", 15, 5)
+pdf("Beasworm.AD_vs_NA.selected.gene1.pdf", 15, 5)
 patchwork::wrap_plots(p.list, ncol = 6)
 dev.off()
 rm(p.list, plot.data, p, one)
