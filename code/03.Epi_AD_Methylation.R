@@ -54,11 +54,22 @@ diff_peaks <- list(
     )
 )
 
+write.table(
+    as.data.frame(diff_peaks$AD_vs_NA$Up)[, 1:3],
+    file = "T_vs_AD_ADhigh.bed",
+    sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE
+)
+write.table(
+    as.data.frame(diff_peaks$AD_vs_NA$Down)[, 1:3],
+    file = "T_vs_AD_Thigh.bed",
+    sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE
+)
+
 table(duplicated(diff_peaks$AD_vs_NA$Up$idx))
 table(duplicated(diff_peaks$AD_vs_NA$Up$peak_id))
 
 # 2. AD diff peak keep in cancer ----
-## 2.1. overlap with cancer peaks ----
+## 2.1. overlap with cancer peaks & CGI ----
 v <- Venn(list(
     "AD_vs_NA" = diff_peaks$AD_vs_NA$Up$peak_id,
     "Ca_vs_NA" = diff_peaks$Ca_vs_NA$Up$peak_id
@@ -75,6 +86,36 @@ pdf("Venn.Down.peak.vs.NA.pdf", 6, 6)
 plot(v, doWeights = TRUE, show = list(Faces = FALSE))
 dev.off()
 rm(v)
+
+# with CGI
+CGI.bed <- ChIPseeker::readPeakFile("E:/LabWork/genome/hg38/hg38.CGI.bed")
+length(CGI.bed)
+
+temp <- diff_peaks$AD_vs_NA$Down
+v <- Venn(Weight = c(
+    "00" = 0,
+    "10" = sum(countOverlaps(CGI.bed, temp) == 0),
+    "01" = sum(countOverlaps(temp, CGI.bed) == 0),
+    "11" = sum(countOverlaps(temp, CGI.bed) > 0)
+), numberOfSets = 2, SetNames = c("CGI", "AD_down"))
+pdf("Venn.Down.peak.all.vs.CGI.pdf", 6, 6)
+plot(v, doWeights = FALSE, show = list(Faces = FALSE))
+dev.off()
+
+temp <- peakset[temp$peak_id] %>% subset(peakType == "Promoter")
+length(temp)
+v <- Venn(Weight = c(
+    "00" = 0,
+    "10" = sum(countOverlaps(CGI.bed, temp) == 0),
+    "01" = sum(countOverlaps(temp, CGI.bed) == 0),
+    "11" = sum(countOverlaps(temp, CGI.bed) > 0)
+), numberOfSets = 2, SetNames = c("CGI", "AD_down_promoter"))
+
+pdf("Venn.Down.peak.promoter.vs.CGI.pdf", 6, 6)
+plot(v, doWeights = FALSE, show = list(Faces = FALSE))
+dev.off()
+
+rm(v, v1, v2)
 
 ## 2.2. heatmap of AD peaks ----
 peakset <- proj_Epi@peakSet
@@ -521,8 +562,8 @@ for (one in gene.selected$gene) {
     p.list[[one]] <- p
 }
 
-pdf("Beasworm.AD_vs_NA.selected.gene1.pdf", 15, 5)
-patchwork::wrap_plots(p.list, ncol = 6)
+pdf("Beasworm.AD_vs_NA.selected.gene1.pdf", 8, 10)
+patchwork::wrap_plots(p.list, ncol = 3)
 dev.off()
 rm(p.list, plot.data, p, one)
 
