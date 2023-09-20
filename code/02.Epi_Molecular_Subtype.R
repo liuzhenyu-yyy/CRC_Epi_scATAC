@@ -239,7 +239,8 @@ p <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "cellColData",
     name = "Epi_Group", embedding = "UMAP",
     pal = mycolor$Epi_Group,
-    size = 0.2, plotAs = "points"
+    size = 0.2, plotAs = "points",
+    labelMeans = FALSE
 )
 pdf("UAMP.Epi.Epi_Group.pdf", 7, 7)
 plot(p)
@@ -306,7 +307,7 @@ p1 <- ggplot(plot.data) +
     scale_fill_manual(values = mycolor$MSI) +
         coord_flip() +
         theme_classic() +
-        theme(axis.title = element_blank())
+        theme(axis.title = element_blank(), axis.text.x = element_blank())
 
 ## Side
 plot.data <- table(cluster.info %>%
@@ -325,7 +326,7 @@ p2 <- ggplot(plot.data) +
     scale_fill_manual(values = mycolor$Side) +
     coord_flip() +
     theme_classic() +
-        theme(axis.title = element_blank())
+        theme(axis.title = element_blank(), axis.text.x = element_blank())
 
 ## Gender
 plot.data <- table(cluster.info %>%
@@ -344,7 +345,7 @@ p3 <- ggplot(plot.data) +
     scale_fill_manual(values = mycolor$Gender) +
         coord_flip() +
         theme_classic() +
-        theme(axis.title.y = element_blank()) +
+        theme(axis.title.y = element_blank(), axis.title.y = element_blank()) +
         ylab("Fraction")
 
 pdf("Bar.Clinical.Group.pdf", 6, 4)
@@ -420,63 +421,78 @@ get_density <- function(x, y, nbins = 100, ...) {
 
 plot.data$Density <- get_density(plot.data$Module.iCMS2, plot.data$Module.iCMS3)
 
-pdf("Dot.Module.iCMS.pdf", 9, 4)
-p1 <- ggplot(plot.data) +
-    geom_point(aes(x = Module.iCMS2, y = Module.iCMS3, color = Density),
-        show.legend = FALSE) +
-    scale_color_viridis_c() +
-    theme_classic()
-p2 <- ggplot(plot.data) +
-    geom_point(aes(x = Module.iCMS2, y = Module.iCMS3, color = Epi_Group)) +
+pdf("Dot.Module.iCMS.pdf", 5, 3.7)
+ggplot(plot.data, aes(x = Module.iCMS2, y = Module.iCMS3)) +
+    geom_point(aes(color = Epi_Group), size = 0.6) +
+    stat_ellipse(aes(group = Epi_Group), level = 0.9) +
     scale_color_manual(values = mycolor$Epi_Group) +
+    ggpubr::stat_cor(label.x.npc = 0.5) +
+    xlim(c(-30, 40)) +
+    ylim(c(-50, 60)) +
     theme_classic()
-wrap_plots(p1, p2, ncol = 2)
 dev.off()
 
-pdf("Box.Module.iCMS.pdf", 5, 4)
-p1 <- ggplot(plot.data, aes(x = Epi_Group, y = Module.iCMS2)) +
-    geom_boxplot(aes(fill = Epi_Group),
-        show.legend = FALSE
+plot.data <- melt(plot.data[, c("Epi_Group", "Module.iCMS3", "Module.iCMS2")], id.vars = c("Epi_Group"))
+
+pdf("Box.Module.iCMS.pdf", 4, 3.5)
+ggplot(plot.data, aes(x = Epi_Group, y = value)) +
+    geom_violin(aes(fill = Epi_Group),
+        show.legend = FALSE, size = 0.2
     ) +
     scale_fill_manual(values = mycolor$Epi_Group) +
-    ggpubr::stat_compare_means(comparisons = list(c("Group_1", "Group_2"))) +
+        ggpubr::stat_compare_means(comparisons = list(c("Group_1", "Group_2"))) +
+        facet_grid(cols = vars(variable), scales = "free_y") +
+        ylab("Module Score") +
     theme_classic()
-p2 <- ggplot(plot.data, aes(x = Epi_Group, y = Module.iCMS3)) +
-    geom_boxplot(aes(fill = Epi_Group),
-        show.legend = FALSE
-    ) +
-    scale_fill_manual(values = mycolor$Epi_Group) +
-    ggpubr::stat_compare_means(comparisons = list(c("Group_1", "Group_2"))) +
-    theme_classic()
+dev.off()
+
+p1 <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    pal = ArchRPalettes$blueYellow,
+    name = "Module.iCMS2", embedding = "UMAP",
+    size = 0.2, plotAs = "points"
+)
+p2 <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    pal = ArchRPalettes$blueYellow,
+    name = "Module.iCMS3", embedding = "UMAP",
+    size = 0.2, plotAs = "points"
+)
+pdf("UAMP.Epi.Module.iCMS.pdf", 8, 4)
 wrap_plots(p1, p2, ncol = 2)
 dev.off()
 
 proj_Epi$Module.iCMS <- proj_Epi$Module.iCMS3 - proj_Epi$Module.iCMS2
+
 p <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "cellColData",
+    pal = ArchRPalettes$blueYellow,
     name = "Module.iCMS", embedding = "UMAP",
     size = 0.2, plotAs = "points"
 )
-pdf("UAMP.Epi.Module.iCMS.pdf", 7, 7)
+pdf("UAMP.Epi.Module.iCMS.diff.pdf", 5, 5)
 plot(p)
 dev.off()
 
 rm(genes, plot.data, p, p1, p2)
 
 gene.selected <- c(
-    "CXCL14", "EREG", "TIMP3", "KRT23", "FN1", "AREG", "CPNE1", "MYC", "PTPRO", "EIF6", "CTSA",
-    "TNFRSF10B", "DNAJC10", "TSTA3", "PFKP", "CDKN2A", "ATL3", "CLU", "MYOF", "DUSP4", "TM4SF4"
+    "EREG", "TIMP3", "MYC", "EIF6", "CTSA",
+    # "KRT23", "AREG", "CPNE1", "MYC", "PTPRO","FN1", "CXCL14",
+    "TNFRSF10B", "PFKP", "CDKN2A", "ATL3", "CLU"
+    # , "DNAJC10", "TSTA3", "MYOF", "DUSP4", "TM4SF4"
 )
 proj_Epi <- addImputeWeights(proj_Epi, reducedDims = "IterativeLSI_merge")
 p <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "GeneScoreMatrix",
+    pal = ArchRPalettes$blueYellow,
     name = gene.selected, embedding = "UMAP",
     imputeWeights = getImputeWeights(proj_Epi),
     size = 0.2, plotAs = "points"
 )
 
-pdf("UMAP.markers.iCMS.pdf", 24, 16)
-patchwork::wrap_plots(plotlist = p, nrow = 4, ncol = 6, byrow = TRUE)
+pdf("UMAP.markers.iCMS.pdf", 20, 8)
+patchwork::wrap_plots(plotlist = p, nrow = 2, ncol = 5, byrow = TRUE)
 dev.off()
 
 lapply(markers.iCMS, length)
@@ -677,14 +693,14 @@ plot.data <- plot.data[order(plot.data$Group,
 ), ]
 plot.data$Description <- factor(plot.data$Description, levels = plot.data$Description)
 
-pdf("GO.marker.group.pdf", 6, 5)
+pdf("GO.marker.group.pdf", 7, 5)
 ggplot(plot.data) +
     geom_bar(aes(x = (0 - log10(p.adjust)), y = Description, fill = Group),
-        stat = "identity", position = "dodge"
+        stat = "identity", position = "dodge", width = 0.4
     ) +
     scale_fill_manual(values = c("#62b7e6", "#283891", "#86d786")) +
     facet_wrap(~Group, ncol = 1, scales = "free_y") +
-        theme_bw() +
+        theme_classic() +
         xlab("minus log10 adjusted p-value") +
         ylab("GO term")
 dev.off()
@@ -749,6 +765,21 @@ write.table(
     col.names = FALSE,
     sep = "\t", quote = FALSE, row.names = FALSE
 )
+temp <- unlist(marker.peak.list) %>%
+    gsub("_", "\t", .) %>%
+    gsub("_", "\t", .) %>%
+    as.data.frame() %>%
+    mutate("a" = unlist(marker.peak.list), "b" = 0, "c" = "-", "d" = 1, "e" = 1)
+c(Group_1 = "#62b7e6", Group_2 = "#283891", Both = "#86d786")
+temp$itemRgb <- rep(c(Group_1 = "98,183,230", Group_2 = "40,56,145", Both = "134,215,134"),
+    times = c(length(marker.peak.list$Group_1), length(marker.peak.list$Group_2), length(marker.peak.list$Both))
+)
+table(temp$itemRgb)
+write.table(temp, "bed/marker.peak.tumor.all.bed",
+    col.names = FALSE,
+    sep = "\t", quote = FALSE, row.names = FALSE
+)
+
 # gene.selected <- c(
 #     "CXCL14", "EREG", "TIMP3", "KRT23", "FN1", "AREG", "CPNE1", "MYC", "PTPRO", "EIF6", "CTSA",
 #     "TNFRSF10B", "DNAJC10", "TSTA3", "PFKP", "CDKN2A", "ATL3", "CLU", "MYOF", "DUSP4", "TM4SF4"
@@ -834,6 +865,7 @@ FC.mat <- data.frame(
 
 pdf("TF_motif/Heatmap.motif.sig.pdf", 10, 4)
 pheatmap(t(FC.mat[TF.sig, ]),
+    color = colorRampPalette(ArchRPalettes$comet)(100),
     scale = "column",
     cluster_rows = FALSE, clustering_method = "ward.D2"
 )
@@ -972,10 +1004,12 @@ rm(FC.mat, plot.data)
 TF.selected <- TF.sig.align[c("MAFK", "FOXA3", "LEF1", "TCF3", "PPARA", "HNF4A")]
 p1 <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "GeneScoreMatrix",
+    pal = ArchRPalettes$blueYellow,
     name = names(TF.selected), embedding = "UMAP",
     imputeWeights = getImputeWeights(proj_Epi),
     size = 0.2, plotAs = "points"
 )
+
 p2 <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "MotifMatrix",
     name = TF.selected, embedding = "UMAP",
@@ -1000,12 +1034,13 @@ proj_Epi <- addGroupCoverages(
     ArchRProj = proj_Epi,
     groupBy = "Epi_Group"
 )
+source("E:/LabWork/code/archr_footprint_no_ribbon.R")
 
 seFoot <- getFootprints(
     ArchRProj = proj_Epi,
     positions = motifPositions[gsub("z:", "", TF.selected)],
     groupBy = "Epi_Group",
-    useGroups = c("Group_1", "Group_2"),
+    useGroups = c("Normal", "Group_1", "Group_2"),
 )
 
 plotFootprints(
@@ -1013,14 +1048,12 @@ plotFootprints(
     ArchRProj = proj_Epi,
     normMethod = "Subtract",
     addDOC = FALSE,
-    plotName = "Plot-Footprints-Subtract.sw10.pdf",
+    plotName = "Plot-Footprints-Subtract.sw10.no_ribbon.pdf",
     pal = mycolor$Epi_Group,
     smoothWindow = 10
 )
 
-?plotFootprints
 rm(motifPositions, seFoot)
 
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 save.image("Epi_Molecular_Subtype.RData")
-
