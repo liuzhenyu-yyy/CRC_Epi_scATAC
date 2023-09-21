@@ -23,7 +23,7 @@ mycolor <- list(
 ## 1.1. get motif devation matrix ----
 proj_Epi <- loadArchRProject(project.dir.epi, force = TRUE)
 table(proj_Epi$Epi_type)
-
+table(proj_Epi$Sample)
 getAvailableMatrices(proj_Epi)
 
 MotifMat <- getMatrixFromProject(
@@ -104,14 +104,22 @@ pdf("UMAP_MotifMat.Epi_Group.pdf", 4.5, 4)
 ggplot(sample.info.tumor, aes(x = UMAP_Motif_1, y = UMAP_Motif_2)) +
     geom_point(aes(color = Epi_Group), size = 0.2) +
     scale_color_manual(values = mycolor$Epi_Group) +
-    theme_classic() +
+    theme_bw() +
+    theme(
+        axis.text = element_blank(), axis.ticks = element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+    ) +
     coord_fixed()
 dev.off()
 pdf("UMAP_MotifMat.CIMP_Group.pdf", 5, 4)
 ggplot(sample.info.tumor, aes(x = UMAP_Motif_1, y = UMAP_Motif_2)) +
     geom_point(aes(color = CIMP_Group), size = 0.2) +
     scale_color_manual(values = mycolor$CIMP_Group) +
-    theme_classic() +
+    theme_bw() +
+    theme(
+        axis.text = element_blank(), axis.ticks = element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+    ) +
     coord_fixed()
 dev.off()
 rm(umap.MotifMat)
@@ -371,19 +379,76 @@ p.module.trait <- corPvalueStudent(cor.module.trait, nrow(MotifMat.cluster))
 cor.module.trait <- t(cor.module.trait) %>% as.data.frame()
 p.module.trait <- t(p.module.trait) %>% as.data.frame()
 
-pdf("Heatmap.cor.Module_Trait.pdf", 7, 4)
+pdf("Heatmap.cor.Module_Trait.pdf", 3, 5)
 corrplot(
-    as.matrix(cor.module.trait),
+    t(as.matrix(cor.module.trait)),
     method = "square",
     # addCoef.col = "black",
     tl.col = "black",
     tl.cex = 1,
-    p.mat = as.matrix(p.module.trait),
+    p.mat = t(as.matrix(p.module.trait)),
     sig.level = c(0.001, 0.01, 0.05),
     pch.cex = 1.3,
     insig = "label_sig",
     col = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100)
 )
+dev.off()
+
+identical(rownames(cluster.info), rownames(MEs))
+plot.data <- cbind(cluster.info %>%
+    select(c("MSI_Status_Major", "Epi_Group", "CIMP_Group")), MEs)
+table(plot.data$MSI_Status_Major)
+
+pdf("WGCNA/Box.Module_MSI.pdf", 2.5, 6)
+plot.data %>%
+    select(c("MSI_Status_Major", "ME9", "ME12")) %>%
+    filter(!MSI_Status_Major == "NA") %>%
+    melt() %>%
+    mutate("Module" = gsub("ME", "Module ", variable)) %>%
+    ggplot(aes(x = MSI_Status_Major, y = value)) +
+    geom_boxplot(aes(fill = MSI_Status_Major), show.legend = FALSE) +
+    scale_fill_manual(values = mycolor$MSI) +
+    ggpubr::stat_compare_means(
+        label = "p.format", label.x.npc = "center"
+    ) +
+    theme_classic() +
+    facet_wrap(~Module, nrow = 2) +
+    ylab("Module Eigenvalue")
+dev.off()
+
+pdf("WGCNA/Box.Module_Epi_Group.pdf", 2.5, 6)
+plot.data %>%
+    select(c("Epi_Group", "ME5", "ME8")) %>%
+    # filter(!MSI_Status_Major == "NA") %>%
+    melt() %>%
+    mutate("Module" = gsub("ME", "Module ", variable)) %>%
+    ggplot(aes(x = Epi_Group, y = value)) +
+    geom_boxplot(aes(fill = Epi_Group), show.legend = FALSE) +
+    scale_fill_manual(values = mycolor$Epi_Group) +
+    ggpubr::stat_compare_means(
+        label = "p.format", label.x.npc = "center"
+    ) +
+    theme_classic() +
+    facet_wrap(~Module, nrow = 2) +
+    ylab("Module Eigenvalue")
+dev.off()
+
+pdf("WGCNA/Box.Module_CIMP_Group.pdf", 3.5, 6)
+plot.data %>%
+    select(c("CIMP_Group", "ME11", "ME8")) %>%
+    # filter(!MSI_Status_Major == "NA") %>%
+    melt() %>%
+    mutate("Module" = gsub("ME", "Module ", variable)) %>%
+    ggplot(aes(x = CIMP_Group, y = value)) +
+    geom_boxplot(aes(fill = CIMP_Group), show.legend = FALSE) +
+    scale_fill_manual(values = mycolor$CIMP_Group) +
+    ggpubr::stat_compare_means(
+        comparisons = list(c("CIMP_Negative", "CIMP_High")),
+        label = "p.format", label.x.npc = "center"
+    ) +
+    theme_classic() +
+    facet_wrap(~Module, nrow = 2) +
+    ylab("Module Eigenvalue")
 dev.off()
 
 ## 3.2. Calculate Gene Trait Significance and Module Membership ----
