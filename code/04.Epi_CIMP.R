@@ -226,17 +226,17 @@ dev.off()
 rm(p.list, i, one, temp)
 
 ## 2.4. compare with molecular subtypes ----
-plot.data <- table(proj_Epi$Epi_Group, proj_Epi$CIMP_Group) %>%
+plot.data <- table(proj_Epi$CIMP_Group, proj_Epi$Epi_Group) %>%
     as.data.frame()
 plot.data <- plot.data %>%
     filter(Var1 != "Normal" & Var1 != "Adenoma") %>%
     filter(Var2 != "Normal" & Var2 != "Adenoma")
 
-plot.data$Pct <- plot.data$Freq / table(proj_Epi$Epi_Group)[plot.data$Var1] * 100
+plot.data$Pct <- plot.data$Freq / table(proj_Epi$CIMP_Group)[plot.data$Var1] * 100
 plot.data$Pct <- round(plot.data$Pct, 1) %>%
     paste0("%")
 
-pdf("Bar.CIMP.vs.CMS.pdf", 5, 2)
+pdf("Bar.CIMP.vs.CMS.pdf", 3, 3)
 ggplot(plot.data) +
     geom_bar(aes(x = Var1, y = Freq, fill = Var2),
         stat = "identity", position = position_fill(reverse = TRUE)
@@ -247,10 +247,9 @@ ggplot(plot.data) +
     ) +
     xlab("Peak type") +
     ylab("Percent of peaks") +
-    coord_flip() +
-    scale_fill_manual(values = mycolor$CIMP_Group) +
+    scale_fill_manual(values = mycolor$Epi_Group) +
     theme_classic() +
-    theme(axis.title = element_blank())
+    theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1))
 dev.off()
 
 # 3. find markers for all groups ----
@@ -267,14 +266,18 @@ markersPeaks.CIMP <- getMarkerFeatures(
     bgdGroups = "Normal"
 )
 saveRDS(markersPeaks.CIMP, "markersPeaks.CIMP.rds")
+# markersPeaks.CIMP <- readRDS("markersPeaks.CIMP.rds")
 
 heatmapPeaks <- plotMarkerHeatmap(
     seMarker = markersPeaks.CIMP,
+    pal = colorRampPalette(rev(brewer.pal(7, "RdYlBu")))(100),
     cutOff = "FDR <= 0.01 & Log2FC>= 1",
-    labelMarkers = c()
+    clusterCols = FALSE,
+    labelRows = FALSE,
+    limits = c(-1.1, 1.1)
 )
 
-pdf("Heatmap.CIMP.marker.peaks.pdf", 6, 5)
+pdf("Heatmap.CIMP.marker.peaks1.pdf", 6, 5)
 plot(heatmapPeaks)
 dev.off()
 rm(heatmapPeaks)
@@ -514,6 +517,7 @@ FC.mat <- data.frame(
 
 pdf("TF_motif/Heatmap.motif.sig.pdf", 10, 4)
 p <- pheatmap::pheatmap(t(FC.mat[TF.sig, ]),
+    color = colorRampPalette(ArchRPalettes$comet)(100),
     scale = "column",
     cluster_rows = FALSE,
     clustering_method = "ward.D2",
@@ -524,7 +528,7 @@ dev.off()
 ## 4.3. visulize CIMP_High specific ----
 # dot plot
 TF.selected <- cutree(p$tree_col, 4) %>%
-    .[. == 2] %>%
+    .[. %in% c(2)] %>%
     names()
 
 plot.data <- lapply(homer.res, function(x) {
@@ -532,18 +536,19 @@ plot.data <- lapply(homer.res, function(x) {
     return(x)
 }) %>% do.call(rbind, .)
 
-plot.data$Group <- factor(plot.data$Group, levels = c("CIMP_High", "CIMP_Low", "CIMP_Negative"))
+plot.data$Group <- factor(plot.data$Group, levels = rev(c("CIMP_High", "CIMP_Low", "CIMP_Negative")))
 plot.data$TF <- factor(plot.data$TF, levels = rev(TF.selected))
 plot.data[plot.data$log.p.value > 1000, ]$log.p.value <- 1000
 
-pdf("TF_motif/Dot.motif.sig.CIMP_High.pdf", 3.5, 3.5)
+pdf("TF_motif/Dot.motif.sig.CIMP_High1.pdf", 6, 2)
 ggplot(plot.data) +
     geom_point(aes(
         x = Group, y = TF,
         fill = log.p.value, size = Log2_Enrichment
     ), pch = 21) +
     scale_fill_viridis_c() +
-    theme_bw() +
+        theme_bw() +
+        coord_flip() +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
 dev.off()
 
@@ -566,9 +571,10 @@ names(TF.sig.align) <- TF.sig.align %>%
 
 TF.selected <- TF.sig.align[c(TF.selected, "TEAD1")]
 TF.selected <- TF.selected[!is.na(TF.selected)]
-
+TF.selected <- TF.selected[c("LEF1", "TCF3", "TCF7", "TEAD1")]
 p1 <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "GeneScoreMatrix",
+    pal = ArchRPalettes$blueYellow,
     name = names(TF.selected), embedding = "UMAP",
     imputeWeights = getImputeWeights(proj_Epi),
     size = 0.2, plotAs = "points"
@@ -579,8 +585,8 @@ p2 <- plotEmbedding(
     imputeWeights = getImputeWeights(proj_Epi),
     size = 0.2, plotAs = "points"
 )
-pdf("TF_motif/UMAP.TF.sig.CIMP_High.pdf", 40, 14)
-wrap_plots(c(p1, p2), ncol = 8)
+pdf("TF_motif/UMAP.TF.sig.CIMP_High1.pdf", 15, 8)
+wrap_plots(c(p1, p2), ncol = 4)
 dev.off()
 rm(p1, p2, p)
 
@@ -596,7 +602,7 @@ seFoot <- getFootprints(
     ArchRProj = proj_Epi,
     positions = motifPositions[gsub("z:", "", TF.selected)],
     groupBy = "CIMP_Group",
-    useGroups = c("CIMP_High", "Normal", "CIMP_Negative"),
+    useGroups = c("CIMP_High", "CIMP_Low", "CIMP_Negative"),
 )
 
 plotFootprints(
