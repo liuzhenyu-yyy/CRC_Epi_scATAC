@@ -333,7 +333,7 @@ ann.row <- data.frame(
     "Cell_Type" = rep("Malignant", ncol(sePeaks@assays@data$PeakMatrix)),
     "test" = 0
 )
-ann.row[c("C3", "C4"),]$Cell_Type <- "Normal"
+ann.row[c("C3", "C4"), ]$Cell_Type <- "Normal"
 ann.row[c("C28", "C9"), ]$Cell_Type <- "Adenoma"
 ann.row$Cell_Type <- factor(ann.row$Cell_Type,
     levels = c("Normal", "Adenoma", "Malignant")

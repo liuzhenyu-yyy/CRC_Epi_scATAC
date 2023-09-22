@@ -253,7 +253,7 @@ ggplot(sft$fitIndices, aes(x = Power, y = -sign(slope) * SFT.R.sq)) +
     ggtitle("Scale independence") +
     geom_hline(yintercept = 0.80, linetype = 2, color = "#f87575") +
     theme_classic() +
-ggplot(sft$fitIndices, aes(x = Power, y = mean.k.)) +
+    ggplot(sft$fitIndices, aes(x = Power, y = mean.k.)) +
     geom_text(aes(label = Power), size = 3) +
     xlab("Soft Threshold (power)") +
     ylab("Mean Connectivity") +
@@ -297,7 +297,7 @@ dev.off()
 
 # plot correlation of all genes
 dissTOM <- 1 - TOMsimilarityFromExpr(MotifMat.cluster, power = 7)
-plotTOM <- dissTOM ^ 10
+plotTOM <- dissTOM^10
 diag(plotTOM) <- NA
 
 pdf("WGCNA/Heatmap.network.all.pdf", 8, 8)
@@ -513,14 +513,14 @@ for (i in seq_along(ME.selected)) {
             size = 2, max.overlaps = 20, point.padding = 1
         ) +
         scale_color_manual(values = mycolor$TF_Family) +
-            ggpubr::stat_cor() +
-            xlab(paste("Gene Module Membership in Module ", ME.selected[i], sep = "")) +
-            ylab(paste("Gene Significance for ", Trait.selected[i])) +
-            xlim(c(min(plot.data$MM) - 0.2, max(plot.data$MM) + 0.2)) +
-            ylim(c(min(plot.data$GS) - 0.2, max(plot.data$GS) + 0.2)) +
-            theme_classic() +
-            scale_size_continuous(range = c(0, 5), limits = c(0, 2.5)) +
-    pdf(paste("GS_MM/Dot.Module", ME.selected[i], "_", Trait.selected[i], ".pdf", sep = ""), 6, 4)
+        ggpubr::stat_cor() +
+        xlab(paste("Gene Module Membership in Module ", ME.selected[i], sep = "")) +
+        ylab(paste("Gene Significance for ", Trait.selected[i])) +
+        xlim(c(min(plot.data$MM) - 0.2, max(plot.data$MM) + 0.2)) +
+        ylim(c(min(plot.data$GS) - 0.2, max(plot.data$GS) + 0.2)) +
+        theme_classic() +
+        scale_size_continuous(range = c(0, 5), limits = c(0, 2.5)) +
+        pdf(paste("GS_MM/Dot.Module", ME.selected[i], "_", Trait.selected[i], ".pdf", sep = ""), 6, 4)
     plot(p)
     dev.off()
 }
