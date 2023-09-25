@@ -23,13 +23,17 @@ names(ArchRPalettes)
 scales::show_col(ArchRPalettes$blueYellow)
 
 proj_CRC$Sample_2 <- gsub("-nofacs", "", proj_CRC$Sample)
+temp <- table(proj_CRC$Sample_2) %>% names()
+rename.patient <- paste0("P", formatC(seq_along(temp), width = 2, flag = 0))
+names(rename.patient) <- temp
+proj_CRC$Sample_2 <- rename.patient[proj_CRC$Sample_2]
 p <- plotEmbedding(
     ArchRProj = proj_CRC, colorBy = "cellColData",
     name = "Sample_2", embedding = "UMAP",
     size = 0.2, plotAs = "points",
     labelMeans = FALSE
 )
-pdf("UAMP.All.Sample.pdf", 7, 7)
+pdf("UMAP.All.Sample1.pdf", 7, 7)
 plot(p)
 dev.off()
 
@@ -40,7 +44,7 @@ p <- plotEmbedding(
     pal = mycolor$Clusters_type,
     labelMeans = FALSE
 )
-pdf("UAMP.All.Clusters_type.pdf", 6, 6)
+pdf("UMAP.All.Clusters_type.pdf", 6, 6)
 plot(p)
 dev.off()
 
@@ -49,7 +53,7 @@ p <- plotEmbedding(
     name = "Clusters", embedding = "UMAP",
     size = 0.2, plotAs = "points"
 )
-pdf("UAMP.All.Clusters.pdf", 7, 7)
+pdf("UMAP.All.Clusters.pdf", 7, 7)
 plot(p)
 dev.off()
 
@@ -142,6 +146,22 @@ ggplot() +
         )
 dev.off()
 
+## 2.4 big wig for IGV visualization ----
+table(proj_CRC$Clusters_type)
+proj_CRC <- addGroupCoverages(
+    ArchRProj = proj_CRC,
+    groupBy = "Clusters_type"
+)
+getGroupBW(
+    ArchRProj = proj_CRC,
+    groupBy = "Clusters_type",
+    normMethod = "ReadsInTSS",
+    tileSize = 30,
+    maxCells = 2000,
+    threads = 4
+)
+
+proj_CRC <- saveArchRProject(ArchRProj = proj_CRC, load = TRUE)
 # 3. scCNV analysis ----
 ## 3.1. call scCNV ----
 
@@ -276,7 +296,7 @@ p <- plotEmbedding(
     size = 0.2, plotAs = "points",
     labelMeans = FALSE
 )
-pdf("UAMP.Epi.Sample.pdf", 7, 7)
+pdf("UMAP.Epi.Sample.pdf", 7, 7)
 plot(p)
 dev.off()
 
@@ -285,7 +305,7 @@ p <- plotEmbedding(
     name = "Clusters_type", embedding = "UMAP",
     size = 0.2, plotAs = "points"
 )
-pdf("UAMP.Epi.Clusters_type.pdf", 7, 7)
+pdf("UMAP.Epi.Clusters_type.pdf", 7, 7)
 plot(p)
 dev.off()
 
@@ -295,7 +315,7 @@ p <- plotEmbedding(
     size = 0.2, plotAs = "points"
 )
 
-pdf("UAMP.Epi.Clusters.pdf", 7, 7)
+pdf("UMAP.Epi.Clusters.pdf", 7, 7)
 plot(p)
 dev.off()
 
@@ -305,7 +325,7 @@ p <- plotEmbedding(
     size = 0.2, plotAs = "points"
 )
 
-pdf("UAMP.Epi.new_location.pdf", 7, 7)
+pdf("UMAP.Epi.new_location.pdf", 7, 7)
 plot(p)
 dev.off()
 
@@ -315,7 +335,7 @@ p <- plotEmbedding(
     size = 0.2, plotAs = "points"
 )
 
-pdf("UAMP.Epi.Type_location.pdf", 7, 7)
+pdf("UMAP.Epi.Type_location.pdf", 7, 7)
 plot(p)
 dev.off()
 
