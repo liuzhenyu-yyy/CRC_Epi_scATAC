@@ -163,8 +163,8 @@ peakmat.type <- peakmat.type[!duplicated(rownames(peakmat.type)), ]
 
 anno.row <- data.frame(
     row.names = rownames(peakmat.type),
-    peak = rep("Down", length(rownames(peakmat.type))),
-    peakType = peakset[rownames(peakmat.type)]$peakType
+    peak = rep("Down", length(rownames(peakmat.type)))
+    #peakType = peakset[rownames(peakmat.type)]$peakType
 )
 
 anno.row[diff_peaks$AD_vs_NA$Up$peak_id, "peak"] <- "Up"
@@ -177,7 +177,7 @@ anno.col <- data.frame(
 mycolor$peak <- c("Up" = "#cd2525", "Down" = "#1774cd")
 
 pdf("Heatmap.AD_vs_NA.all.type1.pdf", 5.5, 6)
-pheatmap(peakmat.type,
+heatmap.merge <- pheatmap(peakmat.type,
     scale = "row",
     show_rownames = FALSE,
     clustering_method = "ward.D2",
@@ -567,4 +567,253 @@ patchwork::wrap_plots(p.list, ncol = 3)
 dev.off()
 rm(p.list, plot.data, p, one)
 
+# 4. Patient paired analysis ----
+dir.create("Paired_Sample")
+patient.selected <- c("COAD06", "COAD16", "COAD17", "COAD18", "COAD24", "COAD34")
+
+## 4.1. get peak * type_sample matrix ----
+table(proj_Epi$Sample, proj_Epi$Epi_type)
+
+proj_Epi$Epi_type_Sample <- paste(proj_Epi$Epi_type,
+    gsub("-nofacs", "", proj_Epi$Sample),
+    sep = "_"
+)
+proj_Epi$Epi_type_Sample <- gsub("Normal_.*", "Normal", proj_Epi$Epi_type_Sample)
+table(proj_Epi$Epi_type_Sample)
+
+# patient * cell type level
+sePeaks.epi.type <- getGroupSE(
+    ArchRProj = proj_Epi,
+    useMatrix = "PeakMatrix",
+    groupBy = "Epi_type_Sample",
+    divideN = TRUE,
+    scaleTo = NULL
+)
+rownames(sePeaks.epi.type) <- paste(rowData(sePeaks.epi.type)$seqnames,
+    rowData(sePeaks.epi.type)$start,
+    rowData(sePeaks.epi.type)$end,
+    sep = "_"
+)
+rownames(sePeaks.epi.type@assays@data$PeakMatrix) <- rownames(sePeaks.epi.type)
+
+peakmat.type.sample <- sePeaks.epi.type@assays@data$PeakMatrix
+peakmat.type.sample <- peakmat.type.sample[, grep(
+    "Normal|COAD06|COAD16|COAD17|COAD18|COAD24|COAD34",
+    colnames(peakmat.type.sample)
+)]
+
+## 4.2. identify Ad diff peak by patients ----
+diff_peaks_patient_AD <- list()
+for (one in patient.selected) {
+    marker.peak.one <- getMarkerFeatures(
+        ArchRProj = proj_Epi,
+        useMatrix = "PeakMatrix",
+        groupBy = "Epi_type_Sample",
+        testMethod = "wilcoxon",
+        bias = c("TSSEnrichment", "log10(nFrags)"),
+        useGroups = paste("Adenoma", one, sep = "_"),
+        bgdGroups = "Normal"
+    )
+
+    pv <- plotMarkers(
+        seMarker = marker.peak.one,
+        name = paste("Adenoma", one, sep = "_"),
+        cutOff = "FDR <= 0.01 & abs(Log2FC) >= 1",
+        plotAs = "Volcano"
+    )
+    pdf(paste("Paired_Sample/Volcano.markers.AD_vs_NA.", one, ".pdf", sep = ""), 5, 4)
+    plot(pv)
+    dev.off()
+
+    marker.peak.one.df <- getMarkers(marker.peak.one,
+        cutOff = "FDR <= 0.01 & abs(Log2FC) >= 1"
+    )
+    marker.peak.one.df <- marker.peak.one.df[[1]] %>%
+        as.data.frame() %>%
+        mutate(
+            id = paste(seqnames, start, end, sep = "_"),
+            peak = ifelse(Log2FC > 0, "Up", "Down")
+        )
+    diff_peaks_patient_AD[[one]] <- split(marker.peak.one.df$id, marker.peak.one.df$peak)
+}
+rm(one, marker.peak.one, marker.peak.one.df, pv, sePeaks.epi.type)
+
+temp <- unlist(diff_peaks_patient_AD, recursive = TRUE)
+peakmat.type.sample <- peakmat.type.sample[temp, ]
+
+temp[grep("Up", names(temp))] %>% table() %>% table()
+temp[grep("Down", names(temp))] %>% table() %>% table()
+rm(temp)
+
+## 4.3. identify Ca diff peak by patients ----
+diff_peaks_patient_Ca <- list()
+for (one in patient.selected) {
+    marker.peak.one <- getMarkerFeatures(
+        ArchRProj = proj_Epi,
+        useMatrix = "PeakMatrix",
+        groupBy = "Epi_type_Sample",
+        testMethod = "wilcoxon",
+        bias = c("TSSEnrichment", "log10(nFrags)"),
+        useGroups = paste("Malignant", one, sep = "_"),
+        bgdGroups = "Normal"
+    )
+
+    pv <- plotMarkers(
+        seMarker = marker.peak.one,
+        name = paste("Malignant", one, sep = "_"),
+        cutOff = "FDR <= 0.01 & abs(Log2FC) >= 1",
+        plotAs = "Volcano"
+    )
+    pdf(paste("Paired_Sample/Volcano.markers.Ca_vs_NA.", one, ".pdf", sep = ""), 5, 4)
+    plot(pv)
+    dev.off()
+
+    marker.peak.one.df <- getMarkers(marker.peak.one,
+        cutOff = "FDR <= 0.01 & abs(Log2FC) >= 1"
+    )
+    marker.peak.one.df <- marker.peak.one.df[[1]] %>%
+        as.data.frame() %>%
+        mutate(
+            id = paste(seqnames, start, end, sep = "_"),
+            peak = ifelse(Log2FC > 0, "Up", "Down")
+        )
+    diff_peaks_patient_Ca[[one]] <- split(marker.peak.one.df$id, marker.peak.one.df$peak)
+}
+rm(one, marker.peak.one, marker.peak.one.df, pv)
+
+# Venn of AD / Ca peaks by patient
+one <- patient.selected[2]
+for (one in patient.selected[2:6]) {
+    v <- Venn(list(
+        Adenoma = unlist(diff_peaks_patient_AD[[one]]$Up),
+        Malignant = unlist(diff_peaks_patient_Ca[[one]]$Up)
+    ))
+    pdf(paste("Paired_Sample/Venn.markers.Up.", one, ".pdf", sep = ""), 5, 4)
+    gridExtra::grid.arrange(grid::grid.grabExpr(plot(v,
+        doWeights = FALSE,
+        show = list(Faces = FALSE)
+    )), top = paste(one, "Up", sep = " "))
+    dev.off()
+
+    v <- Venn(list(
+        Adenoma = unlist(diff_peaks_patient_AD[[one]]$Down),
+        Malignant = unlist(diff_peaks_patient_Ca[[one]]$Down)
+    ))
+    pdf(paste("Paired_Sample/Venn.markers.Down.", one, ".pdf", sep = ""), 5, 4)
+    gridExtra::grid.arrange(grid::grid.grabExpr(plot(v,
+        doWeights = FALSE,
+        show = list(Faces = FALSE)
+    )), top = paste(one, "Down", sep = " "))
+    dev.off()
+}
+rm(v, one)
+
+## 4.4. heatmap of AD peaks by patient ----
+anno.col <- data.frame(
+    row.names = colnames(peakmat.type.sample),
+    Epi_type = gsub("_.*", "", colnames(peakmat.type.sample))
+)
+diff_peaks_patient_AD_state <- list()
+
+for (one in patient.selected[2:6]) {
+    selected <- grep(paste("Normal", one, sep = "|"),
+        colnames(peakmat.type.sample),
+        value = TRUE
+    ) %>%
+        sort() %>%
+        .[c(3, 1, 2)]
+    plot.data <- peakmat.type.sample[unlist(diff_peaks_patient_AD[[one]]), selected]
+
+    anno.row <- data.frame(
+        row.names = rownames(plot.data),
+        change = log2(plot.data[, selected[3]] / plot.data[, selected[1]]),
+        peak = gsub("[0-9]+", "", names(unlist(diff_peaks_patient_AD[[one]])))
+    )
+
+    anno.row$status <- "none"
+    anno.row$status[anno.row$change > 1] <- "Up"
+    anno.row$status[anno.row$change < -1] <- "Down"
+    anno.row$status <- ifelse(anno.row$status == anno.row$peak, "Keep", "Revert")
+    anno.row$change <- NULL
+    while (dev.cur() != 1) {
+        dev.off()
+    }
+    diff_peaks_patient_AD_state[[one]] <- table(anno.row$status, anno.row$peak)
+    # pdf(paste("Paired_Sample/Heatmap.AD_vs_NA.", one, ".pdf", sep = ""), 5.5, 6)
+    # pheatmap(plot.data,
+    #     color = colorRampPalette(rev(brewer.pal(7, "RdYlBu"))[2:6])(100),
+    #     scale = "row",
+    #     show_rownames = FALSE,
+    #     clustering_method = "ward.D2",
+    #     cluster_cols = FALSE,
+    #     cluster_rows = TRUE,
+    #     annotation_col = anno.col,
+    #     annotation_row = anno.row[, c(2, 1)],
+    #     annotation_colors = c(mycolor, list(status = c("Keep" = "#81c6a0", "Revert" = "#f0bd3b")))
+    # )
+    # dev.off()
+}
+rm(selected, plot.data, anno.col, anno.row, one)
+
+temp <- diff_peaks_patient_AD_state$COAD16 +
+    diff_peaks_patient_AD_state$COAD18 +
+    diff_peaks_patient_AD_state$COAD24 +
+    diff_peaks_patient_AD_state$COAD34
+temp[1] / (temp[1] + temp[2]) # 0.5586728 of down peaks
+temp[3] / (temp[3] + temp[4]) # 0.7741892 of Up peaks
+sapply(diff_peaks_patient_AD_state[c("COAD16", "COAD18", "COAD24", "COAD34")], function(x) {
+    return(c(x[1] / (x[1] + x[2]), x[3] / (x[3] + x[4])))
+})
+rm(temp)
+
+## 4.5. Dot visulization of methlation-related genes ----
+p <- plotGroups(
+    ArchRProj = proj_Epi,
+    groupBy = "Epi_type",
+    colorBy = "GeneScoreMatrix",
+    name = gene.selected$gene,
+    plotAs = "violin",
+    maxCells = 8000
+)
+
+p.list <- list()
+for (one in names(p)) {
+    plot.data <- p[[one]]$data
+    colnames(plot.data) <- c("Epi_type", "Value")
+    plot.data$Sample <- as.data.frame(proj_Epi@cellColData)[rownames(plot.data), ]$Sample %>%
+        gsub("-nofacs", "", .)
+    plot.data$Gene <- one
+
+    plot.data$Epi_type <- factor(plot.data$Epi_type,
+        levels = c("Normal", "Adenoma", "Malignant")
+    )
+    plot.data <- plot.data[plot.data$Sample %in% patient.selected[c(2, 4:6)], ]
+
+    p.list[[one]] <- ggplot(plot.data, aes(x = Epi_type, y = Value)) +
+        geom_quasirandom(aes(color = Epi_type), cex = 0.5, show.legend = FALSE) +
+        scale_color_manual(values = mycolor$Epi_type) +
+        scale_fill_manual(values = mycolor$Epi_type) +
+        ggpubr::stat_compare_means(
+            comparisons = list(
+                c("Normal", "Adenoma"),
+                c("Normal", "Malignant"),
+                c("Adenoma", "Malignant")
+            ),
+            size = 2, label.y.npc = 0.5,
+        ) +
+        ylab("Gene Activity Score") +
+        # ggtitle(one) +
+        theme_classic() +
+        facet_grid(cols = vars(Sample), rows = vars(Gene), scales = "free_y") +
+        theme(axis.title.x = element_blank(), axis.text.x = element_blank())
+}
+pdf("Paired_Sample/Beasworm.AD_vs_NA.Up.patient.pdf", 6, 10)
+patchwork::wrap_plots(p.list[1:6], ncol = 1)
+dev.off()
+pdf("Paired_Sample/Beasworm.AD_vs_NA.Down.patient.pdf", 6, 10)
+patchwork::wrap_plots(p.list[7:12], ncol = 1)
+dev.off()
+rm(p, plot.data, p.list, one)
+
+gc()
 save.image("03.Epi_AD_Methylation.RData")
