@@ -1,7 +1,7 @@
 #!/bin/sh
 
 findMotifsGenome=/mnt/d/WSL2/homer/bin/findMotifsGenome.pl
-bed_dir=/mnt/e/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/02.Epi_Molecular_Subtype/bed/cluster
+bed_dir=/mnt/e/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/05.Epi_TF_Clustering/diff_peak_cluster/bed
 
 ls ${bed_dir} |
     awk '{gsub(".bed", "");gsub("marker.peak.tumor.", ""); print $1}' > sample.list
