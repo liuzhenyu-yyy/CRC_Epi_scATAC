@@ -848,11 +848,15 @@ colnames(motif.match) <- gsub("_.+?$", "", colnames(motif.match))
 motif.match[1:5, 1:5]
 rm(temp)
 
-## 6.2. Group2 TFs: HNF4A, PPARA ----
+## 6.2. plot diff peak with motif in each cluster ----
+peaks.common <- list()
+
+# Group2 TFs: HNF4A, PPARA
 cluster.selected <- cluster.info %>%
     filter(Epi_Group == "Group_2") %>%
     rownames()
 
+# HNF4A
 peak.selected <- motif.match[, "HNF4A"] %>%
     .[.] %>%
     names() %>%
@@ -885,6 +889,37 @@ p <- pheatmap(
 )
 dev.off()
 
+temp <- cutree(p$tree_col, 17)
+rowSums(plot.data[names(temp), ]) %>%
+    aggregate(., by = list(temp), FUN = mean) # 4 and 15
+peaks.common[["HNF4A"]] <- names(temp)[temp %in% c(4, 15)]
+
+anno.col <- data.frame(
+    row.names = rownames(plot.data),
+    "con" = ifelse(rownames(plot.data) %in% peaks.common[["HNF4A"]], "Consensus", "Specific")
+)
+
+pdf("TF_motif_cluster/Heatmap.HNF4A.clusterPeaks.pdf", 10, 6)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
+        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_col = anno.col,
+    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 17
+)
+dev.off()
+
+# PPARA
 peak.selected <- motif.match[, "PPARA"] %>%
     .[.] %>%
     names() %>%
@@ -917,7 +952,38 @@ p <- pheatmap(
 )
 dev.off()
 
-## 6.3. Group1 TFs: SOX4, FOXA3 ----
+temp <- cutree(p$tree_col, 15)
+rowSums(plot.data[names(temp), ]) %>%
+    aggregate(., by = list(temp), FUN = mean) # 1 and 4
+peaks.common[["PPARA"]] <- names(temp)[temp %in% c(1, 4)]
+
+anno.col <- data.frame(
+    row.names = rownames(plot.data),
+    "con" = ifelse(rownames(plot.data) %in% peaks.common[["PPARA"]], "Consensus", "Specific")
+)
+
+pdf("TF_motif_cluster/Heatmap.PPARA.clusterPeaks.pdf", 10, 6)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
+        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_col = anno.col,
+    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 15
+)
+dev.off()
+
+# Group1 TFs: SOX4, FOXA3
+# SOX4
 cluster.selected <- cluster.info %>%
     filter(Epi_Group == "Group_1") %>%
     rownames()
@@ -954,6 +1020,36 @@ p <- pheatmap(
 )
 dev.off()
 
+temp <- cutree(p$tree_col, 11)
+rowSums(plot.data[names(temp), ]) %>%
+    aggregate(., by = list(temp), FUN = mean) # 8
+peaks.common[["SOX4"]] <- names(temp)[temp %in% c(8)]
+
+anno.col <- data.frame(
+    row.names = rownames(plot.data),
+    "con" = ifelse(rownames(plot.data) %in% peaks.common[["SOX4"]], "Consensus", "Specific")
+)
+
+pdf("TF_motif_cluster/Heatmap.SOX4.clusterPeaks.pdf", 10, 4.5)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C10", "C11", "C26", "C29", "C27", "C1", "C6",
+        "C24", "C25", "C5"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_col = anno.col,
+    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
+    clustering_method = "ward.D2",
+    cutree_cols = 11
+)
+dev.off()
+
+# FOXA3
 peak.selected <- motif.match[, "FOXA3"] %>%
     .[.] %>%
     names() %>%
@@ -986,7 +1082,155 @@ p <- pheatmap(
 )
 dev.off()
 
-rm(p, peak.selected, cluster.selected, plot.data, motif.match, one)
+temp <- cutree(p$tree_col, 11)
+rowSums(plot.data[names(temp), ]) %>%
+    aggregate(., by = list(temp), FUN = mean) # 8
+peaks.common[["FOXA3"]] <- names(temp)[temp %in% c(8)]
+
+anno.col <- data.frame(
+    row.names = rownames(plot.data),
+    "con" = ifelse(rownames(plot.data) %in% peaks.common[["FOXA3"]], "Consensus", "Specific")
+)
+
+pdf("TF_motif_cluster/Heatmap.FOXA3.clusterPeaks.pdf", 10, 4.5)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C10", "C11", "C26", "C29", "C27", "C1", "C6",
+        "C24", "C25", "C5"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_col = anno.col,
+    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
+    clustering_method = "ward.D2",
+    cutree_cols = 11
+)
+dev.off()
+
+rm(p, peak.selected, cluster.selected, plot.data, motif.match, one, temp, anno.col)
+
+## 6.3. clustering on consensus peak genes ----
+# get consensus peaks to genes
+sapply(peaks.common, length)
+peakset <- proj_Epi@peakSet
+names(peakset) <- paste(seqnames(peakset), start(peakset), end(peakset), sep = "_")
+table(peakset$peakType)
+
+peaks.common.2gene <- sapply(peaks.common, function(one) {
+    temp <- peakset[one]
+    temp <- temp[temp$peakType != "Distal"]
+    return(unique(temp$nearestGene))
+})
+sapply(peaks.common.2gene, length)
+peaks.common.2gene <- unlist(peaks.common.2gene) %>% unique()
+peaks.common.2gene <- peaks.common.2gene[!is.na(peaks.common.2gene)]
+length(peaks.common.2gene) # 1582 geness
+rm(peakset)
+
+# get cell by concensus gene matrix
+cGSMat <- getMatrixFromProject(
+    ArchRProj = proj_Epi,
+    useMatrix = "GeneScoreMatrix",
+    binarize = FALSE
+)
+dim(cGSMat)
+rownames(cGSMat@assays@data$GeneScoreMatrix) <- rowData(cGSMat)$name
+cGSMat <- cGSMat@assays@data$GeneScoreMatrix
+cGSMat <- as.data.frame(cGSMat)
+cGSMat <- cGSMat[peaks.common.2gene, ]
+
+# reduction on consensus peak-genes
+pca.cGSMat <- prcomp(t(cGSMat)[rownames(sample.info.tumor), ],
+    center = TRUE, scale. = TRUE
+)
+
+pdf("TF_motif_cluster/Elbow.pca.cGSMat.pdf", 5, 5)
+plot(pca.cGSMat$sdev[1:50]^2)
+dev.off()
+
+sample.info.tumor$PCA_cGS_1 <- pca.cGSMat$x[rownames(sample.info.tumor), 1]
+sample.info.tumor$PCA_cGS_2 <- pca.cGSMat$x[rownames(sample.info.tumor), 2]
+sample.info.tumor$PCA_cGS_3 <- pca.cGSMat$x[rownames(sample.info.tumor), 3]
+
+pdf("TF_motif_cluster/PCA_cGSMat.Epi_Group.pdf", 12, 3.5)
+ggplot(sample.info.tumor, aes(x = PCA_cGS_1, y = PCA_cGS_2)) +
+    geom_point(aes(color = Epi_Group), size = 0.2) +
+    scale_color_manual(values = mycolor$Epi_Group) +
+    theme_classic() +
+    NoLegend() +
+    ggplot(sample.info.tumor, aes(x = PCA_cGS_1, y = PCA_cGS_3)) +
+    geom_point(aes(color = Epi_Group), size = 0.2) +
+    scale_color_manual(values = mycolor$Epi_Group) +
+    theme_classic() +
+    NoLegend() +
+    ggplot(sample.info.tumor, aes(x = PCA_cGS_2, y = PCA_cGS_3)) +
+    geom_point(aes(color = Epi_Group), size = 0.2) +
+    scale_color_manual(values = mycolor$Epi_Group) +
+    theme_classic()
+dev.off()
+pdf("TF_motif_cluster/PCA_MotifMat.CIMP_Group.pdf", 12, 3.5)
+ggplot(sample.info.tumor, aes(x = PCA_cGS_1, y = PCA_cGS_2)) +
+    geom_point(aes(color = CIMP_Group), size = 0.2) +
+    scale_color_manual(values = mycolor$CIMP_Group) +
+    theme_classic() +
+    NoLegend() +
+    ggplot(sample.info.tumor, aes(x = PCA_cGS_1, y = PCA_cGS_3)) +
+    geom_point(aes(color = CIMP_Group), size = 0.2) +
+    scale_color_manual(values = mycolor$CIMP_Group) +
+    theme_classic() +
+    NoLegend() +
+    ggplot(sample.info.tumor, aes(x = PCA_cGS_2, y = PCA_cGS_3)) +
+    geom_point(aes(color = CIMP_Group), size = 0.2) +
+    scale_color_manual(values = mycolor$CIMP_Group) +
+    theme_classic()
+dev.off()
+
+umap.cGSMat <- uwot::umap(pca.cGSMat$x[, 1:15],
+    n_neighbors = 30,
+    metric = "cosine",
+    min_dist = 1
+)
+sample.info.tumor$UMAP_cGS_1 <- umap.cGSMat[rownames(sample.info.tumor), 1]
+sample.info.tumor$UMAP_cGS_2 <- umap.cGSMat[rownames(sample.info.tumor), 2]
+
+pdf("TF_motif_cluster/UMAP_MotifMat.Epi_Group.pdf", 4.5, 4)
+ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
+    geom_point(aes(color = Epi_Group), size = 0.2) +
+    scale_color_manual(values = mycolor$Epi_Group) +
+    theme_bw() +
+    theme(
+        axis.text = element_blank(), axis.ticks = element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+    ) +
+    coord_fixed()
+dev.off()
+pdf("TF_motif_cluster/UMAP_MotifMat.CIMP_Group.pdf", 5, 4)
+ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
+    geom_point(aes(color = CIMP_Group), size = 0.2) +
+    scale_color_manual(values = mycolor$CIMP_Group) +
+    theme_bw() +
+    theme(
+        axis.text = element_blank(), axis.ticks = element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+    ) +
+    coord_fixed()
+dev.off()
+pdf("TF_motif_cluster/UMAP_MotifMat.Sample.pdf", 7, 6)
+ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
+    geom_point(aes(color = Sample), size = 0.2) +
+    scale_color_manual(values = paletteDiscrete(sample.info.tumor$Sample)) +
+    theme_bw() +
+    theme(
+        axis.text = element_blank(), axis.ticks = element_blank(),
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+    ) +
+    coord_fixed()
+dev.off()
+rm(cGSMat, pca.cGSMat, umap.cGSMat)
 
 gc()
 save.image("05.Epi_TF_Clustering.RData")
