@@ -1044,6 +1044,7 @@ p <- pheatmap(
     annotation_row = cluster.info %>% select(c("Epi_Group")),
     annotation_col = anno.col,
     annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
     clustering_method = "ward.D2",
     cutree_cols = 11
 )
@@ -1106,6 +1107,7 @@ p <- pheatmap(
     annotation_row = cluster.info %>% select(c("Epi_Group")),
     annotation_col = anno.col,
     annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
     clustering_method = "ward.D2",
     cutree_cols = 11
 )
@@ -1130,6 +1132,7 @@ peaks.common.2gene <- unlist(peaks.common.2gene) %>% unique()
 peaks.common.2gene <- peaks.common.2gene[!is.na(peaks.common.2gene)]
 length(peaks.common.2gene) # 1582 geness
 rm(peakset)
+saveRDS(peaks.common.2gene, "peaks.common.2gene.rds")
 
 # get cell by concensus gene matrix
 cGSMat <- getMatrixFromProject(
