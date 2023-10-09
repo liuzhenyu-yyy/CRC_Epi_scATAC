@@ -870,7 +870,7 @@ for (one in cluster.selected) {
     plot.data[peak.selected %in% peaks.clusters[[one]], one] <- 1
 }
 
-pdf("TF_motif_cluster/Heatmap.HNF4A.clusterPeaks.pdf", 10, 6)
+pdf("TF_motif_cluster/Heatmap.HNF4A.clusterPeaks1.pdf", 10, 6)
 p <- pheatmap(
     t(plot.data)[c(
         "C18", "C2", "C16", "C13", "C22", "C17", "C20",
@@ -1113,7 +1113,46 @@ p <- pheatmap(
 )
 dev.off()
 
-rm(p, peak.selected, cluster.selected, plot.data, motif.match, one, temp, anno.col)
+rm(p, peak.selected, cluster.selected, plot.data, one, temp, anno.col)
+
+## 6.3. co-binding of TFs ----
+pdf("TF_motif_cluster/Upset.Consensus.Peaks.pdf", 7, 4.5)
+upset(
+    fromList(
+        peaks.common
+    ),
+    nset = 4,
+    order.by = "freq"
+)
+dev.off()
+
+for (one in c("Group_1", "Group_2")) {
+    cluster.selected <- cluster.info %>%
+        filter(Epi_Group == one) %>%
+        rownames()
+
+    for (genes in list(c("HNF4A", "PPARA"), c("SOX4", "FOXA3"))) {
+        peak.selected1 <- motif.match[, genes[1]] %>%
+            .[.] %>%
+            names() %>%
+            intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
+        peak.selected2 <- motif.match[, genes[2]] %>%
+            .[.] %>%
+            names() %>%
+            intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
+        temp <- list(gene1 = peak.selected1, genes2 = peak.selected2)
+        names(temp) <- c(genes[1], genes[2])
+        v <- Venn(temp)
+
+        pdf(paste("TF_motif_cluster/Venn.", one, "_", genes[1], "_", genes[2], ".pdf", sep = ""), 5, 4)
+        gridExtra::grid.arrange(grid::grid.grabExpr(plot(v,
+            doWeights = TRUE,
+            show = list(Faces = FALSE)
+        )), top = paste(genes[1], genes[2], one, sep = " "))
+        dev.off()
+    }
+}
+rm(one, genes, cluster.selected, peak.selected1, peak.selected2, temp, v, motif.match)
 
 ## 6.3. clustering on consensus peak genes ----
 # get consensus peaks to genes
