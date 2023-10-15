@@ -3,10 +3,10 @@ setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/01.All_scCNV")
 source("../../code/00.Requirements.R")
 
 # 1. load data ----
-proj_CRC <- loadArchRProject(project.dir.all, force = TRUE)
+proj_CRC <- loadArchRProject(project.dir.all, force = TRUE) # 16778 cells
 sample.info <- proj_CRC@cellColData %>% as.data.frame()
 getAvailableMatrices(proj_CRC)
-
+mean(proj_CRC$TSSEnrichment)
 colnames(proj_CRC@cellColData)
 table(proj_CRC$Clusters_type)
 
@@ -80,23 +80,24 @@ mycolor$Location <- c(
 )
 scales::show_col(ArchRPalettes[[1]])
 table(proj_CRC$location)
+proj_CRC$location_new <- gsub("LN", "C", proj_CRC$location)
 
-plot.data <- table(proj_CRC$location, proj_CRC$Clusters_type) %>%
+plot.data <- table(proj_CRC$location_new, proj_CRC$Clusters_type) %>%
     as.data.frame()
-temp <- c("AD" = "Adenoma", "C" = "Cancer", "LN" = "Lymph", "T" = "Normal tissue")
+temp <- c("AD" = "Adenoma", "C" = "Cancer", "T" = "Normal tissue")
 
 plot.data$Var1 <- temp[plot.data$Var1]
 table(plot.data$Var1)
 colnames(plot.data) <- c("Location", "Clusters_type", "Count")
 plot.data$Location <- factor(plot.data$Location,
-    levels = c("Normal tissue", "Adenoma", "Cancer", "Lymph")
+    levels = c("Normal tissue", "Adenoma", "Cancer")
 )
 plot.data$Clusters_type <- factor(plot.data$Clusters_type,
     levels = rev(c("Epithelial", "Fibroblast", "T", "B", "Myeloid"))
 )
 
-temp <- table(proj_CRC$location)[names(temp)] %>% as.data.frame()
-temp$Var1 <- c("Adenoma", "Cancer", "Lymph", "Normal tissue")
+temp <- table(proj_CRC$location_new)[names(temp)] %>% as.data.frame()
+temp$Var1 <- c("Adenoma", "Cancer", "Normal tissue")
 
 pdf("Bar.Location.Cell_Type.pdf", 3.6, 3)
 ggplot() +
@@ -111,16 +112,17 @@ ggplot() +
     ylab("No. of cells")
 dev.off()
 
-table(proj_CRC$Sample)
-plot.data <- table(proj_CRC$Sample, proj_CRC$Clusters_type) %>%
+table(proj_CRC$Sample_2, proj_CRC$Sample)
+table(proj_CRC$Sample_2)
+plot.data <- table(proj_CRC$Sample_2, proj_CRC$Clusters_type) %>%
     as.data.frame()
 colnames(plot.data) <- c("Sample", "Clusters_type", "Count")
 
 plot.data$Percent <- plot.data$Count / table(proj_CRC$Sample)[plot.data$Sample] * 100 %>% as.numeric()
 
 plot.data$MACS <- "MACS"
-plot.data[grep("COAD13", plot.data$Sample), ]$MACS <- "no MACS"
-plot.data$Sample <- gsub("-nofacs", "", plot.data$Sample)
+plot.data[grep("P09", plot.data$Sample), ]$MACS <- "no MACS"
+# plot.data$Sample <- gsub("-nofacs", "", plot.data$Sample)
 
 # orders <- plot.data %>%
 #     filter(Clusters_type == "Epithelial") %>%
@@ -339,51 +341,56 @@ pdf("UMAP.Epi.Type_location.pdf", 7, 7)
 plot(p)
 dev.off()
 
-## 4.2. correlation of epithlium clusters ---
-mycolor$Cell_Type <- c("Normal" = "#208a42", "Adenoma" = "#d51f26", "Malignant" = "#272d6a")
-sePeaks <- getGroupSE(
-    ArchRProj = proj_Epi,
-    useMatrix = "PeakMatrix",
-    groupBy = "Clusters",
-    divideN = TRUE,
-    scaleTo = NULL
-)
-ann.row <- data.frame(
-    row.names = colnames(sePeaks@assays@data$PeakMatrix),
-    "Cell_Type" = rep("Malignant", ncol(sePeaks@assays@data$PeakMatrix)),
-    "test" = 0
-)
-ann.row[c("C3", "C4"), ]$Cell_Type <- "Normal"
-ann.row[c("C28", "C9"), ]$Cell_Type <- "Adenoma"
-ann.row$Cell_Type <- factor(ann.row$Cell_Type,
-    levels = c("Normal", "Adenoma", "Malignant")
-)
-ann.row <- ann.row[order(ann.row$Cell_Type), ]
-ann.row$test <- NULL
+## 4.2. correlation of epithlium clusters ----
+# mycolor$Cell_Type <- c("Normal" = "#208a42", "Adenoma" = "#d51f26", "Malignant" = "#272d6a")
+# sePeaks <- getGroupSE(
+#     ArchRProj = proj_Epi,
+#     useMatrix = "PeakMatrix",
+#     groupBy = "Clusters",
+#     divideN = TRUE,
+#     scaleTo = NULL
+# )
+# ann.row <- data.frame(
+#     row.names = colnames(sePeaks@assays@data$PeakMatrix),
+#     "Cell_Type" = rep("Malignant", ncol(sePeaks@assays@data$PeakMatrix)),
+#     "test" = 0
+# )
+# ann.row[c("C3", "C4"), ]$Cell_Type <- "Normal"
+# ann.row[c("C28", "C9"), ]$Cell_Type <- "Adenoma"
+# ann.row$Cell_Type <- factor(ann.row$Cell_Type,
+#     levels = c("Normal", "Adenoma", "Malignant")
+# )
+# ann.row <- ann.row[order(ann.row$Cell_Type), ]
+# ann.row$test <- NULL
 
-dist.clusters <- dist(t(sePeaks@assays@data$PeakMatrix))
-dist.clusters <- as.matrix(dist.clusters)
-dist.clusters <- dist.clusters[rownames(ann.row), rownames(ann.row)]
-pdf("Heatmap.cluster.distace.pdf", 5, 4)
-pheatmap(dist.clusters,
-    color = colorRampPalette(c("red", "White", "blue"))(100),
-    annotation_row = ann.row,
-    annotation_col = ann.row,
-    cluster_rows = FALSE, cluster_cols = FALSE,
-    method = "ward.D2",
-    annotation_color = mycolor
-)
+# dist.clusters <- dist(t(sePeaks@assays@data$PeakMatrix))
+# dist.clusters <- as.matrix(dist.clusters)
+# dist.clusters <- dist.clusters[rownames(ann.row), rownames(ann.row)]
+# pdf("Heatmap.cluster.distace.pdf", 5, 4)
+# pheatmap(dist.clusters,
+#     color = colorRampPalette(c("red", "White", "blue"))(100),
+#     annotation_row = ann.row,
+#     annotation_col = ann.row,
+#     cluster_rows = FALSE, cluster_cols = FALSE,
+#     method = "ward.D2",
+#     annotation_color = mycolor
+# )
 
-# 5. scCNV for Epi clusters ----
+## 4.3. scCNV for Epi clusters ----
 load("CRC_CNV.rda")
+proj_Epi$Epi_type <- "Malignant"
+proj_Epi$Epi_type[proj_Epi$Clusters %in% c("C3", "C4")] <- "Normal"
+proj_Epi$Epi_type[proj_Epi$Clusters %in% c("C28", "C9")] <- "Adenoma"
+
 sample.info.epi <- proj_Epi@cellColData %>% as.data.frame()
+table(proj_Epi$Epi_type)
 
 anno.row <- sample.info.epi %>%
-    select(Sample, Clusters, new_location)
+    select(Sample, Clusters, Epi_type)
 
 anno.color <- list(
     Clusters = paletteDiscrete(proj_Epi$Clusters),
-    new_location = paletteDiscrete(proj_Epi$new_location),
+    Epi_type = paletteDiscrete(proj_Epi$Epi_type),
     Sample = paletteDiscrete(proj_Epi$Sample),
     seqnames = rep(c("#969696", "#212121"), 11)
 )
@@ -395,7 +402,7 @@ one <- "C1"
 for (one in unique(proj_Epi$Clusters)) {
     print(one)
     cell.select <- rownames(sample.info.epi)[sample.info.epi$Clusters == one]
-    png(paste0("Epi_By_Cluster/Heatmap.CNV.FC.", one, ".png"), 1000, 750)
+    png(paste0("Epi_By_Cluster/Heatmap.CNV.FC.", one, ".png"), 800, 600)
     pheatmap::pheatmap(CNV.FC[cell.select, ],
         color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
         cluster_rows = TRUE, cluster_cols = FALSE,
@@ -416,7 +423,7 @@ dir.create("Epi_By_Sample")
 for (one in unique(proj_Epi$Sample)) {
     print(one)
     cell.select <- rownames(sample.info.epi)[sample.info.epi$Sample == one]
-    png(paste0("Epi_By_Sample/Heatmap.CNV.FC.", one, ".png"), 1000, 750)
+    png(paste0("Epi_By_Sample/Heatmap.CNV.FC.", one, ".png"), 800, 600)
     pheatmap::pheatmap(CNV.FC[cell.select, ],
         color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
         cluster_rows = TRUE, cluster_cols = FALSE,
@@ -432,6 +439,47 @@ for (one in unique(proj_Epi$Sample)) {
     dev.off()
 }
 gc()
+
+# 5. TF deviation heatmap ----
+plot.data <- data.table::fread("T-AD-C-specific_heatmap_data.csv") %>%
+    as.data.frame()
+
+rownames(plot.data) <- plot.data$V1
+plot.data$V1 <- NULL
+plot.data[1:5, 1:5]
+
+table(colnames(plot.data) %in% rownames(proj_Epi@cellColData))
+
+sample.info.epi <- proj_Epi@cellColData %>%
+    as.data.frame() %>%
+    .[colnames(plot.data), ]
+
+anno.col <- sample.info.epi %>%
+    select(Sample, Epi_type)
+
+cutoff <- 2
+plot.data[plot.data > cutoff] <- cutoff
+plot.data[plot.data < -cutoff] <- -cutoff
+
+# scales::show_col(ArchRPalettes$solarExtra)
+# table(anno.col$Epi_type)
+dev.off()
+
+pdf("Heatmap.TF.Epi.type.pdf", 12, 7)
+pheatmap::pheatmap(plot.data,
+    scale = "none",
+    color = colorRampPalette(ArchRPalettes$solarExtra[3:7])(100),
+    cluster_rows = FALSE, cluster_cols = FALSE,
+    annotation_col = anno.col,
+    annotation_colors = list(
+        Epi_type = paletteDiscrete(proj_Epi$Epi_type),
+        Sample = paletteDiscrete(proj_Epi$Sample)
+    ),
+    show_rownames = FALSE, show_colnames = FALSE,
+    gaps_col = c(1910, 1910 + 800),
+    gaps_row = c(45, 53)
+)
+dev.off()
 
 save(CNV.FC, sample.info, anno.col, anno.row, anno.color,
     file = "CRC_CNV.rda"
