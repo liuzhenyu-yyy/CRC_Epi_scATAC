@@ -68,6 +68,73 @@ write.table(
 table(duplicated(diff_peaks$AD_vs_NA$Up$idx))
 table(duplicated(diff_peaks$AD_vs_NA$Up$peak_id))
 
+## 1.3. enrichment with genome annotations ----
+# genes <- genes(TxDb.Hsapiens.UCSC.hg38.knownGene, single.strand.genes.only = FALSE) %>%
+#     unlist()
+# strand(genes) <- "*"
+# genes <- reduce(genes)
+# intergenic <- gaps(genes)
+# intergenic <- intergenic[strand(intergenic) == "*"]
+# sum(width(intergenic)) / 1e9
+
+# repeats <- readRDS("E:/LabWork/genome/hg38/repeats/repeats.all.gr.RDS")
+
+# anno.list <- list(
+#     intergenic = intergenic,
+#     intragenic = genes,
+#     promoter = GenomicFeatures::promoters(TxDb.Hsapiens.UCSC.hg38.knownGene),
+#     exon = GenomicFeatures::exonicParts(TxDb.Hsapiens.UCSC.hg38.knownGene),
+#     intron = GenomicFeatures::intronicParts(TxDb.Hsapiens.UCSC.hg38.knownGene),
+#     CGI = ChIPseeker::readPeakFile("E:/LabWork/genome/hg38/hg38.CGI.bed")
+# )
+# anno.list <- c(anno.list, repeats[c("LINE", "LTR", "Satellite", "Simple_repeat", "SINE")])
+# rm(intergenic, genes, repeats)
+
+# anno.list <- sapply(anno.list, function(x) {
+#     x <- x[seqnames(x) %in% paste("chr", c(1:22, "X"), sep = "")]
+#     x <- reduce(x, ignore.strand = TRUE)
+#     return(x)
+# })
+
+# sapply(anno.list, function(x) {
+#     return(sum(width(x)))
+# }) / 3e9
+
+# dir.create("LOLA_Core/LOLA_Core/regions")
+# for (one in names(anno.list)) {
+#     temp <- as.data.frame(anno.list[[one]])[, 1:3]
+#     write.table(temp, file.path("LOLA_Core/regions", paste(one, "bed", sep = ".")),
+#         sep = "\t", quote = FALSE, row.names = FALSE, col.names = FALSE
+#     )
+# }
+
+# run LOLA test
+library(LOLA)
+regionDB <- loadRegionDB("E:/LabWork/genome/hg38/LOLA_Core")
+locResults <- runLOLA(diff_peaks$AD_vs_NA, proj_Epi@peakSet, regionDB, cores = 1)
+plot.data <- locResults %>%
+    as.data.frame() %>%
+    select(userSet, collection, pValueLog, oddsRatio, qValue, filename) %>%
+    mutate(
+        direction = ifelse(userSet == "Up", 1, -1),
+        filename = gsub(".bed", "", filename)
+    )
+
+pdf("AD_T_diffpeak_enrichment2.pdf", 6, 4)
+ggplot(plot.data) +
+    geom_bar(aes(x = pValueLog * direction, y = filename, fill = oddsRatio * direction), stat = "identity") +
+    facet_grid(rows = vars(collection), scales = "free_y", space = "free") +
+    ggbreak::scale_x_break(breaks = c(-160, -55)) +
+    ggbreak::scale_x_break(breaks = c(55, 315)) +
+    scale_fill_gradient2(low = "#1774cd", high = "#cd2525", mid = "#f7f7f7", midpoint = 0) +
+    scale_x_continuous(breaks = c(-170, -45, -30, -15, 0, 15, 30, 45, 320), limits = c(-175, 330)) +
+    theme(axis.text.x.top = element_blank()) +
+    theme_classic() +
+    xlab("-log10(qValue)") +
+    ylab("Genome Annotation")
+dev.off()
+rm(regionDB, plot.data)
+
 # 2. AD diff peak keep in cancer ----
 ## 2.1. overlap with cancer peaks & CGI ----
 v <- Venn(list(
