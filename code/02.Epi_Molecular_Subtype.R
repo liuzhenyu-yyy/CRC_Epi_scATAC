@@ -625,7 +625,7 @@ dev.off()
 
 rm(plot.data, peak.G1.up, peak.G1.down, peak.G2.up, peak.G2.down)
 
-## 4.2. functional annotation of diff peaks ----
+## 4.2. GO enrichment of diff peaks ----
 # marker peak to nearest gene
 marker.peak.list <- list(
     "Group_1" = rownames(anno.row)[anno.row$Group == "Group_1" & anno.row$Direction == "Up"],
@@ -650,12 +650,23 @@ marker.peak.list <- lapply(
     function(x) temp[x, ]$Name
 )
 
+table(peakset$peakType)
 marker.peak2gene.list <- lapply(
     marker.peak.list,
-    function(x) peakset[x]$nearestGene %>% unique
+    function(x) {
+        peakset[x] %>%
+           #.[.$peakType != "Distal"] %>%
+            .$nearestGene %>%
+            unique()
+    }
 )
+common <- intersect(marker.peak2gene.list$Group_1, marker.peak2gene.list$Group_2)
+marker.peak2gene.list$Both <- c(marker.peak2gene.list$Both, common) %>% unique()
+marker.peak2gene.list$Group_1 <- setdiff(marker.peak2gene.list$Group_1, common)
+marker.peak2gene.list$Group_2 <- setdiff(marker.peak2gene.list$Group_2, common)
+
 lapply(marker.peak2gene.list, length)
-rm(temp, sePeaks, peakset)
+rm(temp, sePeaks, peakset, common)
 
 # GO analysis
 library(clusterProfiler)
@@ -674,9 +685,9 @@ GO.marker.list <- lapply(
 )
 object.size(marker.peak.list) / 1e6
 
-write.csv(GO.marker.list$Group_1, "GO.marker.Group_1.csv")
-write.csv(GO.marker.list$Group_2, "GO.marker.Group_2.csv")
-write.csv(GO.marker.list$Both, "GO.marker.Both.csv")
+write.csv(GO.marker.list$Group_1, "GO.marker.real.Group_1.csv")
+write.csv(GO.marker.list$Group_2, "GO.marker.real.Group_2.csv")
+write.csv(GO.marker.list$Both, "GO.marker.real.Both.csv")
 plot.data <- rbind(
     GO.marker.list$Group_1[c("GO:0033674", "GO:0043410", "GO:0032956", "GO:0034329", "GO:0050727"), ],
     GO.marker.list$Group_2[c("GO:0001763", "GO:0198738", "GO:0016055", "GO:0019827", "GO:0051591"), ],
