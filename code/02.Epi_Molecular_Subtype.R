@@ -812,6 +812,62 @@ write.table(temp, "bed/marker.peak.tumor.all.bed",
 
 rm(gene, marker.peak.tumor.gr, p, track.subtype)
 
+## 4.4. GREAT enrichment of diff peaks ----
+GREAT.marker.list <- list(
+    "Group_1" = read.table("GREAT/Group1_greatExportAll.tsv", header = FALSE, sep = "\t"),
+    "Group_2" = read.table("GREAT/Group2_greatExportAll.tsv", , header = FALSE, sep = "\t"),
+    "Common" = read.table("GREAT/Common_greatExportAll.tsv", , header = FALSE, sep = "\t")
+)
+sapply(GREAT.marker.list, dim)
+colnames(GREAT.marker.list$Group_1) <- c(
+    "Ontology", "ID", "Desc",
+    "BinomRank", "BinomP", "BinomBonfP", "BinomFdrQ", "RegionFoldEnrich", "ExpRegions",
+    "ObsRegions", "GenomeFrac", "SetCov", "HyperRank", "HyperP", "HyperBonfP",
+    "HyperFdrQ", "GeneFoldEnrich", "ExpGenes", "ObsGenes", "TotalGenes", "GeneSetCov",
+    "TermCov", "Regions", "Genes"
+)
+colnames(GREAT.marker.list$Group_2) <- colnames(GREAT.marker.list$Group_1)
+colnames(GREAT.marker.list$Common) <- colnames(GREAT.marker.list$Group_1)
+rownames(GREAT.marker.list$Group_1) <- GREAT.marker.list$Group_1$ID
+rownames(GREAT.marker.list$Group_2) <- GREAT.marker.list$Group_2$ID
+rownames(GREAT.marker.list$Common) <- GREAT.marker.list$Common$ID
+
+plot(Vennerable::Venn(list(
+    "Group_1" = GREAT.marker.list$Group_1$ID,
+    "Group_2" = GREAT.marker.list$Group_2$ID,
+    "Common" = GREAT.marker.list$Common$ID
+)))
+View(GREAT.marker.list$Group_1)
+
+plot.data <- rbind(
+    GREAT.marker.list$Group_1[c("GO:0043069", "GO:0002274", "GO:1903037", "GO:0045321", "GO:0050863", "GO:0043408"), ],
+    GREAT.marker.list$Group_2[c("GO:0034969", "GO:0018216", "GO:1903465", "GO:1902153", "GO:1902808", "GO:0048378"), ],
+    GREAT.marker.list$Common[c("GO:0030856", "GO:0002009", "GO:0043065", "GO:0006366", "GO:0035295", "GO:0035019"), ]
+)
+plot.data$Group <- factor(
+    rep(c("Group_1", "Group_2", "Common"), each = 6),
+    levels = c("Group_1", "Group_2", "Common")
+)
+
+plot.data <- plot.data[order(plot.data$Group,
+    plot.data$BinomBonfP,
+    decreasing = TRUE
+), ]
+plot.data$Desc <- factor(plot.data$Desc, levels = plot.data$Desc)
+# View(plot.data)
+pdf("GREAT.marker.group.pdf", 8, 6)
+ggplot(plot.data) +
+    geom_bar(aes(x = (0 - log10(BinomBonfP)), y = Desc, fill = Group),
+        stat = "identity", position = "dodge", width = 0.4
+    ) +
+    scale_fill_manual(values = c("#62b7e6", "#283891", "#86d786")) +
+    facet_wrap(~Group, ncol = 1, scales = "free") +
+    theme_classic() +
+    xlab("minus log10 adjusted p-value") +
+    ylab("GO term")
+dev.off()
+rm(plot.data, GREAT.marker.list, GO.marker.list)
+
 # 5. TF enrichment in marker peaks ----
 dir.create("TF_motif")
 ## 5.1. run HOMER ----
