@@ -236,7 +236,7 @@ plot.data$Pct <- plot.data$Freq / table(proj_Epi$CIMP_Group)[plot.data$Var1] * 1
 plot.data$Pct <- round(plot.data$Pct, 1) %>%
     paste0("%")
 
-pdf("Bar.CIMP.vs.CMS.pdf", 3, 3)
+pdf("Bar.CMS.vs.CIMP.pdf", 3, 3)
 ggplot(plot.data) +
     geom_bar(aes(x = Var1, y = Freq, fill = Var2),
         stat = "identity", position = position_fill(reverse = TRUE)
@@ -251,6 +251,16 @@ ggplot(plot.data) +
     theme_classic() +
     theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1))
 dev.off()
+
+plot.data <- table(ifelse(proj_Epi$CIMP_Group == "CIMP_Negative", "yes", "no"), proj_Epi$Epi_Group) %>%
+    as.data.frame() %>%
+        filter(Var1 != "Normal" & Var1 != "Adenoma") %>%
+        filter(Var2 != "Normal" & Var2 != "Adenoma")
+test.data <- matrix(plot.data$Freq, 2)
+colnames(test.data) <- c("Group_1", "Group_2")
+rownames(test.data) <- c("no", "yes")
+chisq.test(test.data)
+fisher.test(test.data)
 
 # 3. find markers for all groups ----
 ## 3.1. identify diff peaks of each cluster ----
