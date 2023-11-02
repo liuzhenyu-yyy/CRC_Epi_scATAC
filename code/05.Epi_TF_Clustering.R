@@ -392,7 +392,8 @@ p.module.trait <- t(p.module.trait) %>% as.data.frame()
 
 orders <- gsub("ME", "", colnames(cor.module.trait)) %>%
     as.numeric() %>%
-    order()
+    order() %>%
+    .[2:length(.)]
 pdf("WGCNA/Heatmap.cor.Module_Trait1.pdf", 3, 5)
 corrplot(
     t(as.matrix(cor.module.trait[, orders])),
@@ -524,7 +525,7 @@ for (i in seq_along(ME.selected)) {
     p <- ggplot(plot.data, aes(x = MM, y = GS)) +
         geom_point(aes(color = Family, size = log10(GeneScore_Malignant))) +
         ggrepel::geom_text_repel(aes(label = Symbol, color = Family),
-            size = 2, max.overlaps = 20, point.padding = 1
+            size = 2, max.overlaps = 50, point.padding = 1
         ) +
         scale_color_manual(values = mycolor$TF_Family) +
         ggpubr::stat_cor() +
@@ -534,7 +535,7 @@ for (i in seq_along(ME.selected)) {
         ylim(c(min(plot.data$GS) - 0.2, max(plot.data$GS) + 0.2)) +
         theme_classic() +
         scale_size_continuous(range = c(0, 5), limits = c(0, 2.5))
-    pdf(paste("GS_MM/Dot.Module", ME.selected[i], "_", Trait.selected[i], ".pdf", sep = ""), 6, 4)
+    pdf(paste("GS_MM/Dot1.Module", ME.selected[i], "_", Trait.selected[i], ".pdf", sep = ""), 6, 4)
     plot(p)
     dev.off()
 }
@@ -573,9 +574,9 @@ net.all <- induced_subgraph(net.all,
 net.all <- induced_subgraph(net.all,
     vids = V(net.all)[!is.na(V(net.all)$GeneScore_Malignant)]
 )
-
+aricode::AMI(as.character(V(net.all)$Module), as.character(V(net.all)$Family))
 l <- layout_with_fr(net.all)
-pdf("Network/Net.all.module.pdf", 10, 10)
+pdf("Network/Net.all.module1.pdf", 10, 10)
 plot(net.all,
     edge.color = "gray80",
     edge.width = E(net.all)$weight * 0.1,
@@ -607,19 +608,22 @@ for (one in unique(ME.selected)) {
     net.sub <- induced_subgraph(net.sub,
         vids = V(net.sub)[V(net.sub)$degree > 5]
     )
-    pdf(paste("Network/Net.Module", one, ".Family.pdf", sep = ""), 7, 7)
+    pdf(paste("Network/Net.lgl.Module", one, ".Family.pdf", sep = ""), 7, 7)
     plot(net.sub,
         edge.color = "gray80",
         edge.width = E(net.sub)$weight * 0.1,
-        vertex.size = log1p(V(net.sub)$GeneScore_Malignant) * 3,
+        vertex.size = log1p(V(net.sub)$GeneScore_Malignant) * 4,
         vertex.color = mycolor$TF_Family[as.character(V(net.sub)$Family)],
+        vertex.frame.color = "gray35",
+        vertex.frame.width = 2,
+        vertex.label = V(net.sub)$Symbol,
         vertex.label.family = "Arial",
         vertex.label.font = 4,
-        vertex.frame.color = "gray",
         vertex.label.color = "black",
-        vertex.label = V(net.sub)$Symbol,
-        vertex.label.cex = log10(V(net.sub)$GeneScore_Malignant) * 0.4,
-        layout = layout_with_fr(net.sub) * 0.6,
+        vertex.label.cex = 0.7,
+        #vertex.label.cex = log1p(V(net.sub)$GeneScore_Malignant) * 0.15,
+        layout =  layout_with_lgl(net.sub),
+        #layout = layout_with_fr(net.sub) * 0.6,
         main = paste("Module ", one, sep = "")
     )
     dev.off()
@@ -737,7 +741,7 @@ TF.info[grep("SOX", TF.info$Symbol), ] %>%
 gene.selected <- net$colors[net$colors == 8] %>%
     names() %>%
     gsub("_.+?$", "", .) %>%
-    c(., "FOXM1", "MAFK", "FOXA3") %>%
+    c(.,  "MAFK","FOXM1", "FOXA3") %>%
     setdiff(., c(
         "GSC", "FOXH1", "ESRRB", "CRX", # low enrichment
         "SOX10", "SOX15", "SOX3", "SOX7" # low expression
@@ -751,21 +755,23 @@ plot.data <- homer.res.cluster %>%
             gsub("_.+?$", "", .)), "Module8", "Others") %>%
             factor(., levels = rev(c("Module8", "Others")))
     )
+plot.data$TF <- factor(plot.data$TF, levels = rev(gene.selected))
 plot.data[plot.data$log.p.value > 500, ]$log.p.value <- 500
 
-pdf("TF_motif_cluster/Dot.Selected.Module8_EpiGroup1.pdf", 9, 3.5)
+pdf("TF_motif_cluster/Dot.Selected.Module8_EpiGroup1.pdf", 5, 6)
 ggplot(plot.data) +
     geom_point(aes(
-        x = Cluster, y = TF,
+        x = TF, y = Cluster,
         fill = log.p.value, size = Log2_Enrichment
     ), pch = 21) +
     scale_fill_viridis_c() +
     facet_grid(
-        cols = vars(Epi_Group),
-        rows = vars(Module),
+        cols = vars(Module),
+        rows = vars(Epi_Group),
         scales = "free", space = "free"
     ) +
-    theme_bw()
+    theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
 dev.off()
 
 # Module 11: CIMP_Group
@@ -850,7 +856,7 @@ rm(temp)
 
 ## 6.2. plot diff peak with motif in each cluster ----
 peaks.common <- list()
-
+sapply(peaks.common, length)
 # Group2 TFs: HNF4A, PPARA
 cluster.selected <- cluster.info %>%
     filter(Epi_Group == "Group_2") %>%
