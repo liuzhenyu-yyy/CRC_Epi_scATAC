@@ -608,22 +608,27 @@ for (one in unique(ME.selected)) {
     net.sub <- induced_subgraph(net.sub,
         vids = V(net.sub)[V(net.sub)$degree > 5]
     )
-    pdf(paste("Network/Net.lgl.Module", one, ".Family.pdf", sep = ""), 7, 7)
+    pdf(paste("Network/Net.dot.Module", one, ".Family.pdf", sep = ""), 5, 5)
     plot(net.sub,
-        edge.color = "gray80",
-        edge.width = E(net.sub)$weight * 0.1,
-        vertex.size = log1p(V(net.sub)$GeneScore_Malignant) * 4,
+        # edge.color = "gray80",
+        edge.color = adjustcolor(mycolor$TF_Module[as.character(one)], alpha.f = 0.15),
+        edge.width = E(net.sub)$weight * 0.01,
+        # edge.width = 0.01,
+        # vertex.size = 4,
+        vertex.size = log1p(V(net.sub)$GeneScore_Malignant) * 1,
         vertex.color = mycolor$TF_Family[as.character(V(net.sub)$Family)],
         vertex.frame.color = "gray35",
-        vertex.frame.width = 2,
+        vertex.frame.width = 0,
         vertex.label = V(net.sub)$Symbol,
         vertex.label.family = "Arial",
-        vertex.label.font = 4,
+        vertex.label.font = 3,
         vertex.label.color = "black",
-        vertex.label.cex = 0.7,
-        #vertex.label.cex = log1p(V(net.sub)$GeneScore_Malignant) * 0.15,
-        layout =  layout_with_lgl(net.sub),
-        #layout = layout_with_fr(net.sub) * 0.6,
+        vertex.label.cex = 0.6,
+        # vertex.label.cex = log1p(V(net.sub)$GeneScore_Malignant) * 0.2,
+        vertex.label.dist = 1,
+        vertex.label.degree = -pi / 4,
+        layout = layout_with_lgl(net.sub),
+        # layout = layout_with_fr(net.sub) * 0.6,
         main = paste("Module ", one, sep = "")
     )
     dev.off()
@@ -1160,7 +1165,7 @@ for (one in c("Group_1", "Group_2")) {
 }
 rm(one, genes, cluster.selected, peak.selected1, peak.selected2, temp, v, motif.match)
 
-## 6.3. clustering on consensus peak genes ----
+## 6.4. consensus peak genes ----
 # get consensus peaks to genes
 sapply(peaks.common, length)
 peakset <- proj_Epi@peakSet
@@ -1170,14 +1175,37 @@ table(peakset$peakType)
 peaks.common.2gene <- sapply(peaks.common, function(one) {
     temp <- peakset[one]
     temp <- temp[temp$peakType != "Distal"]
-    return(unique(temp$nearestGene))
+    temp <- unique(temp$nearestGene)
+    temp <- temp[!is.na(temp)]
+    return(temp)
 })
 sapply(peaks.common.2gene, length)
-peaks.common.2gene <- unlist(peaks.common.2gene) %>% unique()
-peaks.common.2gene <- peaks.common.2gene[!is.na(peaks.common.2gene)]
-length(peaks.common.2gene) # 1582 geness
+
+length(unlist(peaks.common.2gene) %>% unique()) # 1582 geness
 rm(peakset)
 saveRDS(peaks.common.2gene, "peaks.common.2gene.rds")
+
+# overlap with iCMS markers
+markers.iCMS <- read.table("E:/LabWork/Project/CRC_NGS_ATAC/iCMS markers.txt",
+    stringsAsFactors = FALSE,
+    sep = "\t", header = TRUE
+)
+markers.iCMS <- base::as.list(markers.iCMS)
+genes <- getFeatures(proj_Epi, useMatrix = "GeneScoreMatrix")
+markers.iCMS <- lapply(markers.iCMS, function(x) intersect(x, genes))
+lapply(markers.iCMS, length)
+
+for (TF in names(peaks.common.2gene)) {
+    pdf(paste0("TF_motif_cluster/Venn.peaks.common.", TF, ".iCMS.pdf"), 5, 4)
+    for (genes in names(markers.iCMS)) {
+        temp <- list(target = peaks.common.2gene[[TF]], iCMS = markers.iCMS[[genes]])
+        names(temp) <- c(TF, genes)
+        v <- Vennerable::Venn(temp)
+        plot(v, doWeights = TRUE, show = list(Faces = FALSE))
+    }
+    dev.off()
+}
+rm(TF, genes, temp, v, markers.iCMS)
 
 # get cell by concensus gene matrix
 cGSMat <- getMatrixFromProject(
@@ -1189,7 +1217,7 @@ dim(cGSMat)
 rownames(cGSMat@assays@data$GeneScoreMatrix) <- rowData(cGSMat)$name
 cGSMat <- cGSMat@assays@data$GeneScoreMatrix
 cGSMat <- as.data.frame(cGSMat)
-cGSMat <- cGSMat[peaks.common.2gene, ]
+cGSMat <- cGSMat[unlist(peaks.common.2gene) %>% unique(), ]
 
 # reduction on consensus peak-genes
 pca.cGSMat <- prcomp(t(cGSMat)[rownames(sample.info.tumor), ],
@@ -1220,7 +1248,7 @@ ggplot(sample.info.tumor, aes(x = PCA_cGS_1, y = PCA_cGS_2)) +
     scale_color_manual(values = mycolor$Epi_Group) +
     theme_classic()
 dev.off()
-pdf("TF_motif_cluster/PCA_MotifMat.CIMP_Group.pdf", 12, 3.5)
+pdf("TF_motif_cluster/PCA_cGS.CIMP_Group.pdf", 12, 3.5)
 ggplot(sample.info.tumor, aes(x = PCA_cGS_1, y = PCA_cGS_2)) +
     geom_point(aes(color = CIMP_Group), size = 0.2) +
     scale_color_manual(values = mycolor$CIMP_Group) +
@@ -1245,7 +1273,7 @@ umap.cGSMat <- uwot::umap(pca.cGSMat$x[, 1:15],
 sample.info.tumor$UMAP_cGS_1 <- umap.cGSMat[rownames(sample.info.tumor), 1]
 sample.info.tumor$UMAP_cGS_2 <- umap.cGSMat[rownames(sample.info.tumor), 2]
 
-pdf("TF_motif_cluster/UMAP_MotifMat.Epi_Group.pdf", 4.5, 4)
+pdf("TF_motif_cluster/UMAP_cGS.Epi_Group.pdf", 4.5, 4)
 ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
     geom_point(aes(color = Epi_Group), size = 0.2) +
     scale_color_manual(values = mycolor$Epi_Group) +
@@ -1256,7 +1284,7 @@ ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
     ) +
     coord_fixed()
 dev.off()
-pdf("TF_motif_cluster/UMAP_MotifMat.CIMP_Group.pdf", 5, 4)
+pdf("TF_motif_cluster/UMAP_cGS.CIMP_Group.pdf", 5, 4)
 ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
     geom_point(aes(color = CIMP_Group), size = 0.2) +
     scale_color_manual(values = mycolor$CIMP_Group) +
@@ -1267,7 +1295,7 @@ ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
     ) +
     coord_fixed()
 dev.off()
-pdf("TF_motif_cluster/UMAP_MotifMat.Sample.pdf", 7, 6)
+pdf("TF_motif_cluster/UMAP_cGS.Sample.pdf", 7, 6)
 ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
     geom_point(aes(color = Sample), size = 0.2) +
     scale_color_manual(values = paletteDiscrete(sample.info.tumor$Sample)) +
