@@ -153,7 +153,7 @@ sePeaks <- getGroupSE(
     scaleTo = NULL
 )
 
-dim(sePeaks)
+write.csv(as.data.frame(colData(sePeaks)), "cluster.info.all.csv")
 sample.selected <- setdiff(rownames(sePeaks@colData), c("C3", "C4", "C28", "C9"))
 
 ## 1.4. annotate clusters ----
@@ -272,7 +272,7 @@ dev.off()
 coefmap(NMF.res)
 coef.mat <- coef(NMF.res)
 rownames(coef.mat) <- c("Basis1", "Basis2")
-
+write.csv(coef.mat, "NMF.coefficient.clusters.csv")
 pdf("NMF.coefficient.clusters.pdf", 6, 3)
 pheatmap(coef.mat[, order(coef.mat[1, ] - coef.mat[2, ])],
     annotation_col = anno.col[c(4)],
@@ -1122,5 +1122,6 @@ plotFootprints(
 
 rm(motifPositions, seFoot)
 
+write.csv(cluster.info, "cluster.info.csv")
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 save.image("Epi_Molecular_Subtype.RData")
