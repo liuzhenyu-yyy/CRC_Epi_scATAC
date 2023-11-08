@@ -95,7 +95,7 @@ rownames(marker.sig) <- paste(names(marker.CIMP),
     marker.CIMP,
     sep = "_"
 )
-
+write.csv(marker.sig, "marker.sig.csv")
 anno.col <- cluster.info %>%
     select(c(CIMP_Group, Side_Major, MSI_Status_Major, Gender_Major))
 colnames(anno.col) <- c("CIMP_Group", "Side", "MSI", "Gender")
@@ -144,7 +144,7 @@ ggplot(cluster.info) +
     ylab("NO. of clusters") +
     scale_x_continuous(breaks = seq(0, 8, 1))
 dev.off()
-
+write.csv(cluster.info, "cluster.info.csv")
 sample.info <- proj_Epi@cellColData %>% as.data.frame()
 
 temp <- cluster.info$CIMP_Group
