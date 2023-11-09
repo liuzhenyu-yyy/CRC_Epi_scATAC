@@ -846,7 +846,7 @@ plot.data <- rbind(
 )
 plot.data$Group <- factor(
     rep(c("Group_1", "Group_2", "Common"), each = 6),
-    levels = c("Group_1", "Group_2", "Common")
+    levels = c("Group_2", "Group_1", "Common")
 )
 
 plot.data <- plot.data[order(plot.data$Group,
@@ -860,7 +860,7 @@ ggplot(plot.data) +
     geom_bar(aes(x = (0 - log10(BinomBonfP)), y = Desc, fill = Group),
         stat = "identity", position = "dodge", width = 0.4
     ) +
-    scale_fill_manual(values = c("#62b7e6", "#283891", "#86d786")) +
+    scale_fill_manual(values = c("#283891", "#62b7e6",  "#86d786")) +
     facet_wrap(~Group, ncol = 1, scales = "free") +
     theme_classic() +
     xlab("minus log10 adjusted p-value") +
@@ -1049,8 +1049,8 @@ plot.data <- lapply(homer.res, function(x) {
     return(x)
 }) %>% do.call(rbind, .)
 
-plot.data$Group <- factor(plot.data$Group, levels = c("Group_1", "Common", "Group_2"))
-plot.data$TF <- factor(plot.data$TF, levels = rev(TF.selected))
+plot.data$Group <- factor(plot.data$Group, levels = c("Group_2", "Common", "Group_1"))
+plot.data$TF <- factor(plot.data$TF, levels = (TF.selected))
 
 plot.data[plot.data$log.p.value > 1000, ]$log.p.value <- 1000
 #plot.data[plot.data$Log2_Enrichment > 3, ]$Log2_Enrichment <- 3
