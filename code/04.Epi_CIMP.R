@@ -235,8 +235,8 @@ plot.data <- plot.data %>%
 plot.data$Pct <- plot.data$Freq / table(proj_Epi$CIMP_Group)[plot.data$Var1] * 100
 plot.data$Pct <- round(plot.data$Pct, 1) %>%
     paste0("%")
-
-pdf("Bar.CMS.vs.CIMP.pdf", 3, 3)
+plot.data$Var1 <- factor(plot.data$Var1, levels = c("CIMP_Negative", "CIMP_Low", "CIMP_High"))
+pdf("Bar.CMS.vs.CIMP.pdf", 5, 2.5)
 ggplot(plot.data) +
     geom_bar(aes(x = Var1, y = Freq, fill = Var2),
         stat = "identity", position = position_fill(reverse = TRUE)
@@ -249,7 +249,8 @@ ggplot(plot.data) +
     ylab("Percent of peaks") +
     scale_fill_manual(values = mycolor$Epi_Group) +
     theme_classic() +
-    theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1))
+    theme(axis.title = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1))+
+    coord_flip()
 dev.off()
 
 plot.data <- table(ifelse(proj_Epi$CIMP_Group == "CIMP_Negative", "yes", "no"), proj_Epi$Epi_Group) %>%
@@ -550,7 +551,7 @@ plot.data$Group <- factor(plot.data$Group, levels = rev(c("CIMP_High", "CIMP_Low
 plot.data$TF <- factor(plot.data$TF, levels = rev(TF.selected))
 plot.data[plot.data$log.p.value > 1000, ]$log.p.value <- 1000
 
-pdf("TF_motif/Dot.motif.sig.CIMP_High1.pdf", 6, 2)
+pdf("TF_motif/Dot.motif.sig.CIMP_High1.pdf", 5, 1.5)
 ggplot(plot.data) +
     geom_point(aes(
         x = Group, y = TF,
