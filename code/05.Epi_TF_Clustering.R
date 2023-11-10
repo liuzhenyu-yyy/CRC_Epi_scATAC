@@ -370,7 +370,7 @@ write.table(TF.info, "WGCNA/TF.info.csv",
 # 3. TF module and clinical trait & cancer subtype ----
 ## 3.1. Module & Trait correlation ----
 MEs <- orderMEs(net$MEs, greyName = "ME0")
-
+write.csv(as.data.frame(MEs), "WGCNA/MEs.csv", quote = FALSE, row.names = TRUE)
 colnames(cluster.info)
 datTraits <- cluster.info %>%
     select(c("Gender_Major", "MSI_Status_Major", "Side_Major", "Epi_Group", "CIMP_Group"))
@@ -599,6 +599,14 @@ plot(net.all,
 )
 dev.off()
 
+# plot legend
+pdf("Network/legend.pdf", 5, 5)
+ggplot(data = data.frame(), aes(x = names(mycolor$TF_Module), y = 0:13, color = names(mycolor$TF_Module))) +
+    geom_point(shape = 15) +
+    scale_color_manual(values = mycolor$TF_Module) +
+    theme_bw()
+dev.off()
+
 extrafont::loadfonts()
 for (one in unique(ME.selected)) {
     net.sub <- induced_subgraph(net.all,
@@ -746,7 +754,7 @@ TF.info[grep("SOX", TF.info$Symbol), ] %>%
 gene.selected <- net$colors[net$colors == 8] %>%
     names() %>%
     gsub("_.+?$", "", .) %>%
-    c(.,  "MAFK","FOXM1", "FOXA3") %>%
+    c(., "MAFK", "FOXM1", "FOXA3") %>%
     setdiff(., c(
         "GSC", "FOXH1", "ESRRB", "CRX", # low enrichment
         "SOX10", "SOX15", "SOX3", "SOX7" # low expression
@@ -758,9 +766,11 @@ plot.data <- homer.res.cluster %>%
         Module = ifelse(TF %in% (net$colors[net$colors == 8] %>%
             names() %>%
             gsub("_.+?$", "", .)), "Module8", "Others") %>%
-            factor(., levels = rev(c("Module8", "Others")))
+            factor(., levels = c("Module8", "Others"))
     )
-plot.data$TF <- factor(plot.data$TF, levels = rev(gene.selected))
+plot.data$TF <- factor(plot.data$TF, levels = gene.selected)
+plot.data$Epi_Group <- factor(plot.data$Epi_Group, levels = c("Group_2", "Group_1"))
+plot.data$Cluster <- factor(plot.data$Cluster, levels = rev(unique(plot.data$Cluster)))
 plot.data[plot.data$log.p.value > 500, ]$log.p.value <- 500
 
 pdf("TF_motif_cluster/Dot.Selected.Module8_EpiGroup1.pdf", 5, 6)
