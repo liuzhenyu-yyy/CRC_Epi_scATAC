@@ -544,7 +544,7 @@ peak.G2.up <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] >= 1 & temp$FDR[,
 peak.G2.down <- rownames(marker.peak.vs.Normal)[temp$Log2FC[, 2] <= (-1) & temp$FDR[, 2] <= 0.01]
 rm(temp)
 
-pdf("Upset.markers.group_vs_normal.pdf", 7, 4.5)
+pdf("Upset.markers.group_vs_normal.pdf", 6, 4.5)
 upset(
     fromList(
         list(
