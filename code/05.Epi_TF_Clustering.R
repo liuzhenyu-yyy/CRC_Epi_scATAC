@@ -754,7 +754,7 @@ TF.info[grep("SOX", TF.info$Symbol), ] %>%
 gene.selected <- net$colors[net$colors == 8] %>%
     names() %>%
     gsub("_.+?$", "", .) %>%
-    c(., "MAFK", "FOXM1", "FOXA3") %>%
+    c(., "CDX2", "MAFK", "FOXM1", "FOXA3") %>%
     setdiff(., c(
         "GSC", "FOXH1", "ESRRB", "CRX", # low enrichment
         "SOX10", "SOX15", "SOX3", "SOX7" # low expression
