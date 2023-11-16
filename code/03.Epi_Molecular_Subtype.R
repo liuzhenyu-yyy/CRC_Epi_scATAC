@@ -1,4 +1,4 @@
-setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/02.Epi_Molecular_Subtype")
+setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/03.Epi_Molecular_Subtype")
 source("../../code/00.Requirements.R")
 load("Epi_Molecular_Subtype.RData")
 

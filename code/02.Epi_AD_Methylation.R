@@ -1,5 +1,5 @@
-setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/03.Epi_AD_Methylation")
-# load("03.Epi_AD_Methylation.RData")
+setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/02.Epi_AD_Methylation")
+load("02.Epi_AD_Methylation.RData")
 source("../../code/00.Requirements.R")
 library(ggbeeswarm)
 
@@ -111,6 +111,7 @@ table(duplicated(diff_peaks$AD_vs_NA$Up$peak_id))
 # run LOLA test
 library(LOLA)
 regionDB <- loadRegionDB("E:/LabWork/genome/hg38/LOLA_Core")
+sapply(diff_peaks$AD_vs_NA, length)
 locResults <- runLOLA(diff_peaks$AD_vs_NA, proj_Epi@peakSet, regionDB, cores = 1)
 plot.data <- locResults %>%
     as.data.frame() %>%
@@ -374,6 +375,7 @@ ggplot(plot.data, aes(x = Epi_type, y = Mean)) +
     theme_classic() +
     scale_color_manual(values = mycolor$Epi_type) +
     scale_x_discrete(expand = c(0.02, 0.05)) +
+    scale_y_continuous(labels = c(0.1, 0.2, 0.3), breaks = c(0.1, 0.2, 0.3)) +
     ylab("Mean ATAC signal")
 dev.off()
 rm(plot.data)
@@ -430,6 +432,7 @@ anno.row <- data.frame(
     peak = rep("Down", length(rownames(betamat.peak))),
     peakType = peakset[rownames(betamat.peak)]$peakType
 )
+anno.row$peakType <- NULL
 anno.row[rownames(anno.row) %in% diff_peaks$AD_vs_NA$Up$peak_id, "peak"] <- "Up"
 table(anno.row$peak)
 
@@ -450,10 +453,17 @@ p <- pheatmap(betamat.peak,
     )
 )
 
-plot.data <- betamat.peak[p$tree_row$order, p$tree_col$order]
+# plot.data <- betamat.peak[p$tree_row$order, p$tree_col$order]
+plot.data <- betamat.peak[
+    order(rowMeans(betamat.peak[, sample.info.array[colnames(betamat.peak), ]$Location == "Normal"])),
+    p$tree_col$order
+]
 plot.data <- plot.data[order(rownames(plot.data) %in% diff_peaks$AD_vs_NA$Up$peak_id), ]
 plot.data <- plot.data[, order(sample.info.array[colnames(plot.data), ]$Location)]
-pdf("Heatmap.beta.AD_vs_NA.all.type1.pdf", 5.5, 6)
+table(rownames(plot.data) %in% diff_peaks$AD_vs_NA$Up$peak_id)
+plot.data <- plot.data[c(1:1257, rev(1258:4736)), ]
+
+pdf("Heatmap.beta.AD_vs_NA.all.type.pdf", 5.5, 6)
 pheatmap(plot.data,
     scale = "none",
     color = colorRampPalette(c("#3a2f99", "#d2cc02"))(100),
@@ -467,13 +477,14 @@ pheatmap(plot.data,
         "Location" = mycolor$Epi_type,
         "peak" = mycolor$peak,
         "peakType" = mycolor$peakType
-    )
+    ),
+    gaps_row = c(1257)
 )
 dev.off()
 
 rm(anno.col, anno.row, plot.data, p)
 
-## 3.3. beesworm of aggregated peaks ----
+## 3.3. Line chart of aggregated peaks ----
 sample.info.array$Mean_AD_Up <- colMeans(
     betamat.peak[rownames(betamat.peak) %in% diff_peaks$AD_vs_NA$Up$peak_id, ],
     na.rm = TRUE
@@ -493,7 +504,7 @@ plot.data$Location <- factor(plot.data$Location,
 )
 pdf("Line.beta.Cluster.AD_vs_NA.Up.pdf", 4, 3)
 ggplot(plot.data, aes(x = Location, y = Mean)) +
-    geom_line(aes(group = 1), size = 1, color = "#cd2525") +
+    geom_line(aes(group = 1), size = 1, lty = 2, color = "#cd2525") +
     geom_ribbon(aes(x = 1:3, ymin = Mean - SD, ymax = Mean + SD),
         alpha = 0.2, fill = "#cd2525"
     ) +
@@ -501,6 +512,7 @@ ggplot(plot.data, aes(x = Location, y = Mean)) +
     theme_classic() +
     scale_color_manual(values = mycolor$Epi_type) +
     scale_x_discrete(expand = c(0.02, 0.05)) +
+        scale_y_continuous(labels = c(0.4,0.5,0.6), breaks = c(0.4,0.5,0.6)) +
     ylab("Mean beta value")
 dev.off()
 
@@ -514,7 +526,7 @@ plot.data$Location <- factor(plot.data$Location,
 )
 pdf("Line.beta.Cluster.AD_vs_NA.Down.pdf", 4, 3)
 ggplot(plot.data, aes(x = Location, y = Mean)) +
-    geom_line(aes(group = 1), size = 1, color = "#1774cd") +
+    geom_line(aes(group = 1), size = 1, lty = 2, color = "#1774cd") +
     geom_ribbon(aes(x = 1:3, ymin = Mean - SD, ymax = Mean + SD),
         alpha = 0.2, fill = "#1774cd"
     ) +
@@ -526,38 +538,38 @@ ggplot(plot.data, aes(x = Location, y = Mean)) +
 dev.off()
 rm(plot.data)
 
-pdf("Beasworm.AD_vs_NA.Up.pdf", 4, 3.5)
-ggplot(sample.info.array, aes(x = Location, y = Mean_AD_Up)) +
-    geom_beeswarm(aes(color = Location), cex = 2.5, show.legend = FALSE) +
-    geom_violin(aes(fill = Location), alpha = 0.2, show.legend = FALSE) +
-    scale_color_manual(values = mycolor$Epi_type) +
-    ggpubr::stat_compare_means(
-        comparisons = list(
-            c("Normal", "Adenoma"),
-            c("Normal", "Malignant"),
-            c("Adenoma", "Malignant")
-        )
-    ) +
-    ylab("Mean beta value") +
-    scale_fill_manual(values = mycolor$Epi_type) +
-    theme_classic()
-dev.off()
-pdf("Beasworm.AD_vs_NA.Down.pdf", 4, 3.5)
-ggplot(sample.info.array, aes(x = Location, y = Mean_AD_Down)) +
-    geom_beeswarm(aes(color = Location), cex = 2.5, show.legend = FALSE) +
-    geom_violin(aes(fill = Location), alpha = 0.2, show.legend = FALSE) +
-    scale_color_manual(values = mycolor$Epi_type) +
-    scale_fill_manual(values = mycolor$Epi_type) +
-    ggpubr::stat_compare_means(
-        comparisons = list(
-            c("Normal", "Adenoma"),
-            c("Normal", "Malignant"),
-            c("Adenoma", "Malignant")
-        )
-    ) +
-    ylab("Mean beta value") +
-    theme_classic()
-dev.off()
+# pdf("Beasworm.AD_vs_NA.Up.pdf", 4, 3.5)
+# ggplot(sample.info.array, aes(x = Location, y = Mean_AD_Up)) +
+#     geom_beeswarm(aes(color = Location), cex = 2.5, show.legend = FALSE) +
+#     geom_violin(aes(fill = Location), alpha = 0.2, show.legend = FALSE) +
+#     scale_color_manual(values = mycolor$Epi_type) +
+#     ggpubr::stat_compare_means(
+#         comparisons = list(
+#             c("Normal", "Adenoma"),
+#             c("Normal", "Malignant"),
+#             c("Adenoma", "Malignant")
+#         )
+#     ) +
+#     ylab("Mean beta value") +
+#     scale_fill_manual(values = mycolor$Epi_type) +
+#     theme_classic()
+# dev.off()
+# pdf("Beasworm.AD_vs_NA.Down.pdf", 4, 3.5)
+# ggplot(sample.info.array, aes(x = Location, y = Mean_AD_Down)) +
+#     geom_beeswarm(aes(color = Location), cex = 2.5, show.legend = FALSE) +
+#     geom_violin(aes(fill = Location), alpha = 0.2, show.legend = FALSE) +
+#     scale_color_manual(values = mycolor$Epi_type) +
+#     scale_fill_manual(values = mycolor$Epi_type) +
+#     ggpubr::stat_compare_means(
+#         comparisons = list(
+#             c("Normal", "Adenoma"),
+#             c("Normal", "Malignant"),
+#             c("Adenoma", "Malignant")
+#         )
+#     ) +
+#     ylab("Mean beta value") +
+#     theme_classic()
+# dev.off()
 
 ## 3.4. single gene visulization ----
 temp <- peakset[names(diff_peak.AD.probe)] %>%
@@ -782,7 +794,8 @@ anno.col <- data.frame(
 )
 diff_peaks_patient_AD_state <- list()
 
-for (one in patient.selected[2:6]) {
+for (one in patient.selected[c(2, 4:6)]) {
+    one <- patient.selected[c(6)]
     selected <- grep(paste("Normal", one, sep = "|"),
         colnames(peakmat.type.sample),
         value = TRUE
@@ -802,23 +815,41 @@ for (one in patient.selected[2:6]) {
     anno.row$status[anno.row$change < -1] <- "Down"
     anno.row$status <- ifelse(anno.row$status == anno.row$peak, "Keep", "Revert")
     anno.row$change <- NULL
+
+    # diff_peaks_patient_AD_state[[one]] <- table(anno.row$status, anno.row$peak)
+    p <- pheatmap(plot.data,
+        color = colorRampPalette(rev(brewer.pal(7, "RdYlBu"))[2:6])(100),
+        scale = "row",
+        show_rownames = FALSE,
+        clustering_method = "ward.D2",
+        cluster_cols = FALSE,
+        cluster_rows = TRUE,
+        annotation_col = anno.col,
+        annotation_row = anno.row[, c(2, 1)],
+        annotation_colors = c(mycolor, list(status = c("Keep" = "#81c6a0", "Revert" = "#f0bd3b")))
+    )
+    plot.data <- plot.data[p$tree_row$order, ]
+    plot.data <- plot.data[order(
+        anno.row[rownames(plot.data), "peak"],
+        anno.row[rownames(plot.data), "status"]
+    ), ]
+
     while (dev.cur() != 1) {
         dev.off()
     }
-    diff_peaks_patient_AD_state[[one]] <- table(anno.row$status, anno.row$peak)
-    # pdf(paste("Paired_Sample/Heatmap.AD_vs_NA.", one, ".pdf", sep = ""), 5.5, 6)
-    # pheatmap(plot.data,
-    #     color = colorRampPalette(rev(brewer.pal(7, "RdYlBu"))[2:6])(100),
-    #     scale = "row",
-    #     show_rownames = FALSE,
-    #     clustering_method = "ward.D2",
-    #     cluster_cols = FALSE,
-    #     cluster_rows = TRUE,
-    #     annotation_col = anno.col,
-    #     annotation_row = anno.row[, c(2, 1)],
-    #     annotation_colors = c(mycolor, list(status = c("Keep" = "#81c6a0", "Revert" = "#f0bd3b")))
-    # )
-    # dev.off()
+    pdf(paste("Paired_Sample/Heatmap.AD_vs_NA.", one, ".pdf", sep = ""), 5.5, 6)
+    pheatmap(plot.data,
+        color = colorRampPalette(rev(brewer.pal(7, "RdYlBu"))[2:6])(100),
+        scale = "row",
+        show_rownames = FALSE,
+        clustering_method = "ward.D2",
+        cluster_cols = FALSE,
+        cluster_rows = FALSE,
+        annotation_col = anno.col,
+        annotation_row = anno.row[, c(2, 1)],
+        annotation_colors = c(mycolor, list(status = c("Keep" = "#81c6a0", "Revert" = "#f0bd3b")))
+    )
+    dev.off()
 }
 rm(selected, plot.data, anno.col, anno.row, one)
 
