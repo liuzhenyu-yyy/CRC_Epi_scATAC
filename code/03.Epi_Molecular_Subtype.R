@@ -433,15 +433,15 @@ ggplot(plot.data, aes(x = Module.iCMS2, y = Module.iCMS3)) +
 dev.off()
 
 plot.data <- melt(plot.data[, c("Epi_Group", "Module.iCMS3", "Module.iCMS2")], id.vars = c("Epi_Group"))
-
-pdf("Box.Module.iCMS.pdf", 4, 3.5)
+plot.data$Epi_Group <- factor(plot.data$Epi_Group, levels = c("Group_2", "Group_1"))
+pdf("Box.Module.iCMS.pdf", 4.5, 3.5)
 ggplot(plot.data, aes(x = Epi_Group, y = value)) +
     geom_violin(aes(fill = Epi_Group),
         show.legend = FALSE, size = 0.2
     ) +
     scale_fill_manual(values = mycolor$Epi_Group) +
         ggpubr::stat_compare_means(comparisons = list(c("Group_1", "Group_2"))) +
-        facet_grid(cols = vars(variable), scales = "free_y") +
+        facet_wrap(~variable, scales = "free_y") +
         ylab("Module Score") +
     theme_classic()
 dev.off()

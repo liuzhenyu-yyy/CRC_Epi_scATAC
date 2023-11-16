@@ -102,7 +102,7 @@ sample.info.tumor$UMAP_Motif_2 <- umap.MotifMat[rownames(sample.info.tumor), 2]
 
 pdf("UMAP_MotifMat.Epi_Group.pdf", 4.5, 4)
 ggplot(sample.info.tumor, aes(x = UMAP_Motif_1, y = UMAP_Motif_2)) +
-    geom_point(aes(color = Epi_Group), size = 0.2) +
+    geom_point(aes(color = Epi_Group), size = 0.4) +
     scale_color_manual(values = mycolor$Epi_Group) +
     theme_bw() +
     theme(
