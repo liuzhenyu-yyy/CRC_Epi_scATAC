@@ -14,9 +14,9 @@ mycolor <- list(
         "Normal" = "#208a42", "Adenoma" = "#d51f26",
         "Group_1" = "#62b7e6", "Group_2" = "#283891"
     ),
-    "CIMP_Group" = c(
-        "Normal" = "#208a42", "Adenoma" = "#d51f26",
-        "CIMP_High" = "#59b891", "CIMP_Low" = "#fa774f", "CIMP_Negative" = "#7a8dbf"
+    "CIMP_Group" <- c(
+        "Normal" = "gray50", "Adenoma" = "gray51",
+        "CIMP_High" = "#f76960", "CIMP_Low" = "#fdec5c", "CIMP_Negative" = "#a5da57"
     )
 )
 
@@ -466,6 +466,21 @@ plot.data %>%
     ylab("Module Eigenvalue")
 dev.off()
 
+# anova for CIMP
+shapiro.test(plot.data$ME11[plot.data$CIMP_Group == "CIMP_Negative"])
+shapiro.test(plot.data$ME11[plot.data$CIMP_Group == "CIMP_Low"])
+shapiro.test(plot.data$ME11[plot.data$CIMP_Group == "CIMP_High"])
+shapiro.test(plot.data$ME8[plot.data$CIMP_Group == "CIMP_Negative"])
+shapiro.test(plot.data$ME8[plot.data$CIMP_Group == "CIMP_Low"])
+shapiro.test(plot.data$ME8[plot.data$CIMP_Group == "CIMP_Negative"])
+bartlett.test(ME11 ~ CIMP_Group, data = plot.data)
+bartlett.test(ME8 ~ CIMP_Group, data = plot.data)
+
+aov.test <- aov(ME11 ~ CIMP_Group, data = plot.data)
+summary(aov.test)
+aov.test <- aov(ME8 ~ CIMP_Group, data = plot.data)
+summary(aov.test)
+
 ## 3.2. Calculate Gene Trait Significance and Module Membership ----
 identical(rownames(MotifMat.cluster), rownames(MEs))
 
@@ -845,7 +860,7 @@ ggplot(plot.data) +
 dev.off()
 rm(plot.data, gene.selected, p)
 
-# 6. same TF, different peaks in each cluster ----
+# 6. inter-patient heterogeneity by patient-specific peaks ----
 ## 6.1. get data ----
 # significant peaks of each clusters
 peaks.clusters <- list()
@@ -1003,17 +1018,17 @@ p <- pheatmap(
 )
 dev.off()
 
-# Group1 TFs: SOX4, FOXA3
-# SOX4
+# Group1 TFs: SOX2, FOXA3
+# SOX2
 cluster.selected <- cluster.info %>%
     filter(Epi_Group == "Group_1") %>%
     rownames()
 
-peak.selected <- motif.match[, "SOX4"] %>%
+peak.selected <- motif.match[, "SOX2"] %>%
     .[.] %>%
     names() %>%
     intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
-length(peak.selected) # 8540 SOX4 peaks
+length(peak.selected) # 6048 SOX2 peaks
 
 plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
 rownames(plot.data) <- peak.selected
@@ -1022,11 +1037,11 @@ for (one in cluster.selected) {
     plot.data[peak.selected %in% peaks.clusters[[one]], one] <- 1
 }
 
-pdf("TF_motif_cluster/Heatmap.SOX4.clusterPeaks.pdf", 10, 4.5)
+pdf("TF_motif_cluster/Heatmap.SOX2.clusterPeaks.pdf", 10, 4.5)
 p <- pheatmap(
     t(plot.data)[c(
-        "C10", "C11", "C26", "C29", "C27", "C1", "C6",
-        "C24", "C25", "C5"
+        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
+        "C27", "C1"
     ), ],
     scale = "none",
     cluster_rows = FALSE,
@@ -1043,19 +1058,19 @@ dev.off()
 
 temp <- cutree(p$tree_col, 11)
 rowSums(plot.data[names(temp), ]) %>%
-    aggregate(., by = list(temp), FUN = mean) # 8
-peaks.common[["SOX4"]] <- names(temp)[temp %in% c(8)]
+    aggregate(., by = list(temp), FUN = mean) # 1
+peaks.common[["SOX2"]] <- names(temp)[temp %in% c(1)]
 
 anno.col <- data.frame(
     row.names = rownames(plot.data),
-    "con" = ifelse(rownames(plot.data) %in% peaks.common[["SOX4"]], "Consensus", "Specific")
+    "con" = ifelse(rownames(plot.data) %in% peaks.common[["SOX2"]], "Consensus", "Specific")
 )
 
-pdf("TF_motif_cluster/Heatmap.SOX4.clusterPeaks.pdf", 10, 4.5)
+pdf("TF_motif_cluster/Heatmap.SOX2.clusterPeaks.pdf", 10, 4.5)
 p <- pheatmap(
     t(plot.data)[c(
-        "C10", "C11", "C26", "C29", "C27", "C1", "C6",
-        "C24", "C25", "C5"
+        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
+        "C27", "C1"
     ), ],
     scale = "none",
     cluster_rows = FALSE,
@@ -1076,7 +1091,7 @@ peak.selected <- motif.match[, "FOXA3"] %>%
     .[.] %>%
     names() %>%
     intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
-length(peak.selected) # 18275 SOX4 peaks
+length(peak.selected) # 18275 FOXA3 peaks
 
 plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
 rownames(plot.data) <- peak.selected
@@ -1088,8 +1103,8 @@ for (one in cluster.selected) {
 pdf("TF_motif_cluster/Heatmap.FOXA3.clusterPeaks.pdf", 10, 4.5)
 p <- pheatmap(
     t(plot.data)[c(
-        "C10", "C11", "C26", "C29", "C27", "C1", "C6",
-        "C24", "C25", "C5"
+        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
+        "C27", "C1"
     ), ],
     scale = "none",
     cluster_rows = FALSE,
@@ -1117,8 +1132,8 @@ anno.col <- data.frame(
 pdf("TF_motif_cluster/Heatmap.FOXA3.clusterPeaks.pdf", 10, 4.5)
 p <- pheatmap(
     t(plot.data)[c(
-        "C10", "C11", "C26", "C29", "C27", "C1", "C6",
-        "C24", "C25", "C5"
+        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
+        "C27", "C1"
     ), ],
     scale = "none",
     cluster_rows = FALSE,
@@ -1152,7 +1167,7 @@ for (one in c("Group_1", "Group_2")) {
         filter(Epi_Group == one) %>%
         rownames()
 
-    for (genes in list(c("HNF4A", "PPARA"), c("SOX4", "FOXA3"))) {
+    for (genes in list(c("HNF4A", "PPARA"), c("SOX2", "FOXA3"))) {
         peak.selected1 <- motif.match[, genes[1]] %>%
             .[.] %>%
             names() %>%
