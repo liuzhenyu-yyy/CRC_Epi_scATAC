@@ -69,8 +69,8 @@ mycolor <- list(
         "Group_1" = "#62b7e6", "Group_2" = "#283891"
     ),
     "CIMP_Group" = c(
-        "Normal" = "#208a42", "Adenoma" = "#d51f26",
-        "CIMP_High" = "#59b891", "CIMP_Low" = "#fa774f", "CIMP_Negative" = "#7a8dbf"
+        "Normal" = "gray50", "Adenoma" = "gray51",
+        "CIMP_High" = "#f76960", "CIMP_Low" = "#fdec5c", "CIMP_Negative" = "#a5da57"
     )
 )
 
@@ -166,7 +166,7 @@ proj_Epi <- addCellColData(
 p <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "cellColData",
     name = "CIMP_Group", embedding = "UMAP",
-    pal = c(mycolor$Epi_Group, mycolor$CIMP_Group),
+    pal = c(mycolor$CIMP_Group),
     size = 0.2, plotAs = "points",
     labelMeans = FALSE
 )
@@ -613,7 +613,7 @@ seFoot <- getFootprints(
     ArchRProj = proj_Epi,
     positions = motifPositions[gsub("z:", "", TF.selected)],
     groupBy = "CIMP_Group",
-    useGroups = c("CIMP_High", "CIMP_Low", "CIMP_Negative"),
+    useGroups = c("CIMP_High", "CIMP_Low", "Normal"),
 )
 
 plotFootprints(
@@ -622,7 +622,7 @@ plotFootprints(
     normMethod = "Subtract",
     addDOC = FALSE,
     plotName = "Footprints_CIMP_Group_Subtract.sw10.pdf",
-    pal = c(mycolor$CIMP_Group, "Normal" = "#208a42"),
+    pal = c(mycolor$CIMP_Group),
     smoothWindow = 10
 )
 
