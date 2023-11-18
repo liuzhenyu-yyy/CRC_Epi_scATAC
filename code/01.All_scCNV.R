@@ -420,11 +420,16 @@ for (one in unique(proj_Epi$Clusters)) {
 gc()
 
 dir.create("Epi_By_Sample")
+sample.info.epi$Epi_type <- factor(sample.info.epi$Epi_type,
+    levels = c("Normal", "Adenoma", "Malignant")
+)
+
+one <- "COAD18"
 for (one in unique(proj_Epi$Sample)) {
     print(one)
     cell.select <- rownames(sample.info.epi)[sample.info.epi$Sample == one]
-    png(paste0("Epi_By_Sample/Heatmap.CNV.FC.", one, ".png"), 800, 600)
-    pheatmap::pheatmap(CNV.FC[cell.select, ],
+    png(paste0("Epi_By_Sample/Heatmap.CNV.FC.png"), 800, 600)
+    p <- pheatmap::pheatmap(CNV.FC[cell.select, ],
         color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
         cluster_rows = TRUE, cluster_cols = FALSE,
         clustering_method = "ward.D2",
@@ -437,8 +442,35 @@ for (one in unique(proj_Epi$Sample)) {
         main = one
     )
     dev.off()
+    cell.select <- cell.select[p$tree_row$order]
+    cell.select <- cell.select[order(sample.info.epi[cell.select, ]$Epi_type)]
+    while (dev.cur() != 1) {
+        dev.off()
+    }
+    png(paste0("Epi_By_Sample/Heatmap.CNV.FC.", one, ".png"), 800, 600)
+    pheatmap::pheatmap(CNV.FC[cell.select, ],
+        color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
+        cluster_rows = FALSE, cluster_cols = FALSE,
+        clustering_method = "ward.D2",
+        annotation_row = anno.row[cell.select, ],
+        annotation_col = anno.col,
+        annotation_colors = anno.color,
+        annotation_legend = FALSE,
+        show_rownames = FALSE, show_colnames = FALSE,
+        treeheight_row = 0,
+        main = one
+    )
+    dev.off()
 }
 gc()
+
+pdf("CNV.legend.pdf", 3, 3)
+ggplot(data = data.frame()) +
+    geom_point(aes(x = 1:100, y = 1:100, color = 1:100)) +
+    scale_color_gradient2(low = "#2166AC", mid = "#F7F7F7", high = "#B2182B", midpoint = 50)
+dev.off()
+
+plot(colorRampPalette(rev(brewer.pal(9, "RdBu")))(100))
 
 # 5. TF deviation heatmap ----
 plot.data <- data.table::fread("T-AD-C-specific_heatmap_data.csv") %>%
