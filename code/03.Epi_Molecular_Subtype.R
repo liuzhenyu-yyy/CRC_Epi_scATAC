@@ -934,6 +934,7 @@ pdf("TF_motif/Heatmap.motif.sig.pdf", 10, 4)
 pheatmap(t(FC.mat[TF.sig, ]),
     color = colorRampPalette(ArchRPalettes$comet)(100),
     scale = "column",
+    cutree_cols = 4,
     cluster_rows = FALSE, clustering_method = "ward.D2"
 )
 dev.off()
