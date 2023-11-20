@@ -14,9 +14,9 @@ mycolor <- list(
         "Normal" = "#208a42", "Adenoma" = "#d51f26",
         "Group_1" = "#62b7e6", "Group_2" = "#283891"
     ),
-    "CIMP_Group" <- c(
+    "CIMP_Group" = c(
         "Normal" = "gray50", "Adenoma" = "gray51",
-        "CIMP_High" = "#f76960", "CIMP_Low" = "#fdec5c", "CIMP_Negative" = "#a5da57"
+        "CIMP_High" = "#f76960", "CIMP_Low" = "#fbe625", "CIMP_Negative" = "#89dc0e"
     )
 )
 
@@ -515,6 +515,8 @@ mycolor$TF_Family <- ArchRPalettes$calm[c(1:4, 7, 6, 8:20, 5)]
 names(mycolor$TF_Family) <- temp
 mycolor$TF_Family["Others"] <- "gray50"
 scales::show_col(mycolor$TF_Family)
+
+table(TF.info$Family) %>% sort()
 
 for (i in seq_along(ME.selected)) {
     gene.selected <- net$colors[net$colors == ME.selected[i]] %>% names()
