@@ -311,13 +311,21 @@ pdf("UMAP.Epi.Clusters_type.pdf", 7, 7)
 plot(p)
 dev.off()
 
+cluster.rename <- read.table("cluster_rename.txt", header = 1)
+temp <- cluster.rename$manual
+names(temp) <- cluster.rename$Previous
+proj_Epi$Clusters_2 <- temp[proj_Epi$Clusters]
+mycolor <- ArchR::paletteDiscrete(proj_Epi$Clusters)
+names(mycolor) <- temp[names(mycolor)]
+
 p <- plotEmbedding(
     ArchRProj = proj_Epi, colorBy = "cellColData",
-    name = "Clusters", embedding = "UMAP",
+    name = "Clusters_2", embedding = "UMAP",
+    pal = mycolor,
     size = 0.2, plotAs = "points"
 )
 
-pdf("UMAP.Epi.Clusters.pdf", 7, 7)
+pdf("UMAP.Epi.Clusters_2.pdf", 7, 7)
 plot(p)
 dev.off()
 
