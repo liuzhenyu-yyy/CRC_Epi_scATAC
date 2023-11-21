@@ -69,7 +69,7 @@ mycolor <- list(
         "Group_1" = "#62b7e6", "Group_2" = "#283891"
     ),
     "CIMP_Group" = c(
-        "Normal" = "gray50", "Adenoma" = "gray51",
+        "Normal" = "gray75", "Adenoma" = "gray76",
         "CIMP_High" = "#f76960", "CIMP_Low" = "#fbe625", "CIMP_Negative" = "#89dc0e"
     )
 )
