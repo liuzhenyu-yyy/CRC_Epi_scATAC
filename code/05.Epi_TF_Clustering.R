@@ -705,6 +705,21 @@ for (one in rownames(cluster.info)) {
 }
 rm(one, marker.peak.one.df, marker.peak.one, test)
 
+# statistcs of diff peaks by patient
+peaks.clusters <- sapply(rownames(cluster.info), function(one) {
+    temp <- read.table(paste0("diff_peak_cluster/marker.peak.tumor.", one, ".tsv"),
+        header = TRUE, sep = "\t", stringsAsFactors = FALSE
+    )
+    return(paste(temp$seqnames, temp$start, temp$end, sep = "_"))
+})
+sapply(peaks.clusters, length)
+temp <- peaks.clusters  %>%  unlist() %>% table() %>% sort(decreasing = TRUE)
+
+length(unique(unname(unlist(peaks.clusters)))) # 159823
+sum(temp > 2) # 56587
+sum(temp > 5) # 22463
+sum(temp > 12) # 3997
+
 # find motifs in each patient
 # sh Run.Homoer.Motif.sh
 
@@ -863,7 +878,7 @@ dev.off()
 rm(plot.data, gene.selected, p)
 
 # 6. inter-patient heterogeneity by patient-specific peaks ----
-## 6.1. get data ----
+## 6.1. get data: diff peak & motif match ----
 # significant peaks of each clusters
 peaks.clusters <- list()
 sapply(rownames(cluster.info), function(one) {
@@ -1334,6 +1349,275 @@ ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
     coord_fixed()
 dev.off()
 rm(cGSMat, pca.cGSMat, umap.cGSMat)
+
+# 7. TF target in adenema? paired sample ----
+## 7.1. get data: paired diff peak & motif match ----
+proj_Epi$Patient_Epi <- paste(proj_Epi$Patient, proj_Epi$Epi_Group, sep = "_")
+proj_Epi$Patient_Epi[grep("Normal", proj_Epi$Epi_Group)] <- "Normal"
+table(proj_Epi$Epi_Group[proj_Epi$Patient == "COAD24"])
+
+# only paired samples
+marker.paired.list <- list()
+for (patient in c("COAD16", "COAD18", "COAD24", "COAD34")) {
+    for (one in c("Group_2", "Adenoma")) {
+        if (patient == "COAD34" && one == "Group_2") {
+            one <- "Group_1"
+        }
+        marker.peak.one <- getMarkerFeatures(
+            ArchRProj = proj_Epi,
+            useMatrix = "PeakMatrix",
+            groupBy = "Patient_Epi",
+            testMethod = "wilcoxon",
+            bias = c("TSSEnrichment", "log10(nFrags)"),
+            useGroups = paste(patient, one, sep = "_"),
+            bgdGroups = c("Normal")
+        )
+
+        marker.peak.one.df <- getMarkers(marker.peak.one,
+            cutOff = "FDR <= 0.01 & Log2FC >= 1"
+        )[[1]] %>% as.data.frame()
+
+        marker.paired.list[[paste(patient, one, sep = "_")]] <-
+            paste(marker.peak.one.df$seqnames,
+                marker.peak.one.df$start,
+                marker.peak.one.df$end,
+                sep = "_"
+            )
+    }
+}
+saveRDS(marker.paired.list, "marker.paired.list.RDS")
+marker.paired.list <- readRDS("marker.paired.list.RDS")
+sapply(marker.paired.list, length)
+
+# motif match matrix
+motif.match <- getMatches(ArchRProj = proj_Epi, name = "Motif")
+temp <- rowRanges(motif.match)
+motif.match <- motif.match@assays@data$matches
+
+rownames(motif.match) <- paste(seqnames(temp), start(temp), end(temp), sep = "_")
+colnames(motif.match) <- gsub("_.+?$", "", colnames(motif.match))
+motif.match[1:5, 1:5]
+rm(temp)
+
+temp <- peak.selected <- motif.match[, "PPARA"] %>%
+    .[.] %>%
+    names()
+
+one <- intersect(marker.paired.list$COAD24_Adenoma, temp)
+sum(one %in% peaks.common[["PPARA"]]) / length(one)
+
+## 7.2. iCMS2 TFs ----
+cluster.selected <- cluster.info %>%
+    filter(Epi_Group == "Group_2") %>%
+    rownames()
+marker.paired.list.sub <- marker.paired.list[c(1:6)]
+
+# HNF4A
+peak.selected <- motif.match[, "HNF4A"] %>%
+    .[.] %>%
+    names() %>%
+    intersect(., c(
+        unlist(peaks.clusters[cluster.selected]),
+        unlist(marker.paired.list.sub)
+    ) %>% unique())
+length(peak.selected) # 20724 HNF4A peaks,AD + CRC
+
+plot.data1 <- matrix(0, ncol = length(peak.selected), nrow = length(marker.paired.list.sub))
+colnames(plot.data1) <- peak.selected
+rownames(plot.data1) <- names(marker.paired.list.sub)
+plot.data1 <- as.data.frame(plot.data1)
+
+for (patient in c("COAD16", "COAD18", "COAD24")) {
+    for (one in c("Group_2", "Adenoma")) {
+        temp <- paste(patient, one, sep = "_")
+        plot.data1[temp, colnames(plot.data1) %in% marker.paired.list.sub[[temp]]] <- 1
+    }
+}
+plot.data1 <- plot.data1[c(2, 4, 6, 1, 3, 5), ]
+
+plot.data2 <- matrix(0, ncol = length(peak.selected), nrow = length(cluster.selected))
+colnames(plot.data2) <- peak.selected
+rownames(plot.data2) <- cluster.selected
+plot.data2 <- as.data.frame(plot.data2)
+
+for (one in cluster.selected) {
+    plot.data2[one, peak.selected %in% peaks.clusters[[one]]] <- 1
+}
+
+rownames(plot.data2) <- paste(cluster.selected, cluster.info[cluster.selected, "Patient_Major"], sep = "_")
+plot.data <- rbind(plot.data1, plot.data2)
+
+pdf("TF_motif_cluster/Heatmap.Paired.HNF4A.PatientPeaks.pdf", 10, 6)
+pheatmap(
+    plot.data,
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_color = mycolor,
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 12
+)
+dev.off()
+
+# PPARA
+peak.selected <- motif.match[, "PPARA"] %>%
+    .[.] %>%
+    names() %>%
+    intersect(., c(
+        unlist(peaks.clusters[cluster.selected]),
+        unlist(marker.paired.list.sub)
+    ) %>% unique())
+length(peak.selected) # 10081 HNF4A peaks,AD + CRC
+
+plot.data1 <- matrix(0, ncol = length(peak.selected), nrow = length(marker.paired.list.sub))
+colnames(plot.data1) <- peak.selected
+rownames(plot.data1) <- names(marker.paired.list.sub)
+plot.data1 <- as.data.frame(plot.data1)
+
+for (patient in c("COAD16", "COAD18", "COAD24")) {
+    for (one in c("Group_2", "Adenoma")) {
+        temp <- paste(patient, one, sep = "_")
+        plot.data1[temp, colnames(plot.data1) %in% marker.paired.list.sub[[temp]]] <- 1
+    }
+}
+rowSums(plot.data1)
+plot.data1 <- plot.data1[c(2, 4, 6, 1, 3, 5), ]
+
+plot.data2 <- matrix(0, ncol = length(peak.selected), nrow = length(cluster.selected))
+colnames(plot.data2) <- peak.selected
+rownames(plot.data2) <- cluster.selected
+plot.data2 <- as.data.frame(plot.data2)
+
+for (one in cluster.selected) {
+    plot.data2[one, peak.selected %in% peaks.clusters[[one]]] <- 1
+}
+
+rownames(plot.data2) <- paste(cluster.selected, cluster.info[cluster.selected, "Patient_Major"], sep = "_")
+plot.data <- rbind(plot.data1, plot.data2)
+
+pdf("TF_motif_cluster/Heatmap.Paired.PPARA.PatientPeaks.pdf", 10, 6)
+pheatmap(
+    plot.data,
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_color = mycolor,
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 12
+)
+dev.off()
+
+## 7.3. iCMS3 TFs ----
+cluster.selected <- cluster.info %>%
+    filter(Epi_Group == "Group_1") %>%
+    rownames()
+marker.paired.list.sub <- marker.paired.list[c(7:8)]
+
+# SOX2
+peak.selected <- motif.match[, "SOX2"] %>%
+    .[.] %>%
+    names() %>%
+    intersect(., c(
+        unlist(peaks.clusters[cluster.selected]),
+        unlist(marker.paired.list.sub)
+    ) %>% unique())
+length(peak.selected) # 6175 SOX2 peaks,AD + CRC
+
+plot.data1 <- matrix(0, ncol = length(peak.selected), nrow = length(marker.paired.list.sub))
+colnames(plot.data1) <- peak.selected
+rownames(plot.data1) <- names(marker.paired.list.sub)
+plot.data1 <- as.data.frame(plot.data1)
+
+for (one in c("Group_1", "Adenoma")) {
+    temp <- paste("COAD34", one, sep = "_")
+    plot.data1[temp, colnames(plot.data1) %in% marker.paired.list.sub[[temp]]] <- 1
+}
+
+rowSums(plot.data1)
+plot.data1 <- plot.data1[c(2, 1), ]
+
+plot.data2 <- matrix(0, ncol = length(peak.selected), nrow = length(cluster.selected))
+colnames(plot.data2) <- peak.selected
+rownames(plot.data2) <- cluster.selected
+plot.data2 <- as.data.frame(plot.data2)
+
+for (one in cluster.selected) {
+    plot.data2[one, peak.selected %in% peaks.clusters[[one]]] <- 1
+}
+
+rownames(plot.data2) <- paste(cluster.selected, cluster.info[cluster.selected, "Patient_Major"], sep = "_")
+plot.data <- rbind(plot.data1, plot.data2)
+
+pdf("TF_motif_cluster/Heatmap.Paired.SOX2.PatientPeaks.pdf", 10, 5)
+pheatmap(
+    plot.data,
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_color = mycolor,
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 12
+)
+dev.off()
+
+# FOXA3
+peak.selected <- motif.match[, "FOXA3"] %>%
+    .[.] %>%
+    names() %>%
+    intersect(., c(
+        unlist(peaks.clusters[cluster.selected]),
+        unlist(marker.paired.list.sub)
+    ) %>% unique())
+length(peak.selected) # 18686 FOXA3 peaks,AD + CRC
+
+plot.data1 <- matrix(0, ncol = length(peak.selected), nrow = length(marker.paired.list.sub))
+colnames(plot.data1) <- peak.selected
+rownames(plot.data1) <- names(marker.paired.list.sub)
+plot.data1 <- as.data.frame(plot.data1)
+
+for (one in c("Group_1", "Adenoma")) {
+    temp <- paste("COAD34", one, sep = "_")
+    plot.data1[temp, colnames(plot.data1) %in% marker.paired.list.sub[[temp]]] <- 1
+}
+
+rowSums(plot.data1)
+plot.data1 <- plot.data1[c(2, 1), ]
+
+plot.data2 <- matrix(0, ncol = length(peak.selected), nrow = length(cluster.selected))
+colnames(plot.data2) <- peak.selected
+rownames(plot.data2) <- cluster.selected
+plot.data2 <- as.data.frame(plot.data2)
+
+for (one in cluster.selected) {
+    plot.data2[one, peak.selected %in% peaks.clusters[[one]]] <- 1
+}
+
+rownames(plot.data2) <- paste(cluster.selected, cluster.info[cluster.selected, "Patient_Major"], sep = "_")
+plot.data <- rbind(plot.data1, plot.data2)
+
+pdf("TF_motif_cluster/Heatmap.Paired.FOXA3.PatientPeaks.pdf", 10, 5)
+pheatmap(
+    plot.data,
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_color = mycolor,
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 12
+)
+dev.off()
 
 gc()
 save.image("05.Epi_TF_Clustering.RData")
