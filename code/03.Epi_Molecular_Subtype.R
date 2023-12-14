@@ -1123,6 +1123,22 @@ plotFootprints(
 
 rm(motifPositions, seFoot)
 
+## 5.5. compare significant TF with Absea antiboty ----
+TF.sig.list <- lapply(homer.res, function(x) {
+    x <- x[x$Diff == "up", ]
+    return(x$TF)
+})
+TF.sig.list$Absea <- read.table("E:/LabWork/Project/CRC_NGS_ATAC/Absea.TF.txt")$V1
+
+pdf("TF_motif/Upset.Absea.TF.sig.pdf", 6, 4.5)
+upset(fromList(TF.sig.list), nsets = 4, order.by = "freq")
+dev.off()
+
+TF.sig.list$Absea %>%
+    intersect(TF.sig.list$Group_1) %>%
+    intersect(TF.sig.list$Group_2) %>%
+    intersect(TF.sig.list$Common)
+
 write.csv(cluster.info, "cluster.info.csv")
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 save.image("Epi_Molecular_Subtype.RData")
