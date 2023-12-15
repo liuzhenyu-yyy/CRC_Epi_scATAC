@@ -217,9 +217,9 @@ rm(sePeaks)
 # table(ref, predict(NMF.res))
 # rm(ref)
 
-group.res <- predict(NMF.res) %>%
+group.res <- predict(NMF.res, what = "consensus") %>%
     as.numeric()
-group.res <- (3 - group.res) %>%
+group.res <- group.res %>%
     paste("Group_", ., sep = "")
 names(group.res) <- sample.selected
 
@@ -1124,6 +1124,7 @@ plotFootprints(
 rm(motifPositions, seFoot)
 
 ## 5.5. compare significant TF with Absea antiboty ----
+# Up peaks enriched
 TF.sig.list <- lapply(homer.res, function(x) {
     x <- x[x$Diff == "up", ]
     return(x$TF)
@@ -1138,6 +1139,37 @@ TF.sig.list$Absea %>%
     intersect(TF.sig.list$Group_1) %>%
     intersect(TF.sig.list$Group_2) %>%
     intersect(TF.sig.list$Common)
+
+# up regulated TFs
+Up.gene <- Gepia.DEG %>%
+    filter(adjp < .01 & `Log2(Fold Change)` > 1) %>%
+    pull(`Gene Symbol`)
+v <- Vennerable::Venn(list(
+    "Absea" = TF.Absea,
+    "Up" = Up.gene
+))
+pdf("TF_motif/Venn.Absea.Up.pdf", 6, 4.5)
+plot(v, doWeights = FALSE, show = list(Faces = FALSE))
+dev.off()
+intersect(TF.Absea, Up.gene)
+
+# down regulated TFs
+TF.Absea <- read.table("E:/LabWork/Project/CRC_NGS_ATAC/Absea.TF.txt")$V1
+Gepia.DEG <- data.table::fread("E:/LabWork/Project/CRC_NGS_ATAC/GEPIA.COAD.DEG.txt", header = TRUE) %>%
+    as.data.frame()
+colnames(Gepia.DEG)
+
+Down.gene <- Gepia.DEG %>%
+    filter(adjp < .01 & `Log2(Fold Change)` < -1) %>%
+    pull(`Gene Symbol`)
+v <- Vennerable::Venn(list(
+    "Absea" = TF.Absea,
+    "Down" = Down.gene
+))
+pdf("TF_motif/Venn.Absea.Down.pdf", 6, 4.5)
+plot(v, doWeights = FALSE, show = list(Faces = FALSE))
+dev.off()
+intersect(TF.Absea, Down.gene)
 
 write.csv(cluster.info, "cluster.info.csv")
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
