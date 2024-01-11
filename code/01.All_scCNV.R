@@ -164,7 +164,7 @@ getGroupBW(
 )
 
 proj_CRC <- saveArchRProject(ArchRProj = proj_CRC, load = TRUE)
-# 3. scCNV analysis ----
+# 3. scCNV analysis of all cells ----
 ## 3.1. call scCNV ----
 
 # dir.create("cells")
@@ -349,48 +349,237 @@ pdf("UMAP.Epi.Type_location.pdf", 7, 7)
 plot(p)
 dev.off()
 
-## 4.2. correlation of epithlium clusters ----
-# mycolor$Cell_Type <- c("Normal" = "#208a42", "Adenoma" = "#d51f26", "Malignant" = "#272d6a")
-# sePeaks <- getGroupSE(
-#     ArchRProj = proj_Epi,
-#     useMatrix = "PeakMatrix",
-#     groupBy = "Clusters",
-#     divideN = TRUE,
-#     scaleTo = NULL
-# )
-# ann.row <- data.frame(
-#     row.names = colnames(sePeaks@assays@data$PeakMatrix),
-#     "Cell_Type" = rep("Malignant", ncol(sePeaks@assays@data$PeakMatrix)),
-#     "test" = 0
-# )
-# ann.row[c("C3", "C4"), ]$Cell_Type <- "Normal"
-# ann.row[c("C28", "C9"), ]$Cell_Type <- "Adenoma"
-# ann.row$Cell_Type <- factor(ann.row$Cell_Type,
-#     levels = c("Normal", "Adenoma", "Malignant")
-# )
-# ann.row <- ann.row[order(ann.row$Cell_Type), ]
-# ann.row$test <- NULL
+## 4.2. batch effect -----
+AMI.cluster <- c(
+    Normal = aricode::AMI(
+        sample.info.epi %>% filter(Epi_type == "Normal") %>% pull(Clusters),
+        sample.info.epi %>% filter(Epi_type == "Normal") %>% pull(Sample)
+    ),
+    Adenoma = aricode::AMI(
+        sample.info.epi %>% filter(Epi_type == "Adenoma") %>% pull(Clusters),
+        sample.info.epi %>%
+            filter(Epi_type == "Adenoma") %>%
+            pull(Sample)
+    ),
+    Malignant = aricode::AMI(
+        sample.info.epi %>% filter(Epi_type == "Malignant") %>% pull(Clusters),
+        sample.info.epi %>% filter(Epi_type == "Malignant") %>% pull(Sample)
+    )
+)
 
-# dist.clusters <- dist(t(sePeaks@assays@data$PeakMatrix))
-# dist.clusters <- as.matrix(dist.clusters)
-# dist.clusters <- dist.clusters[rownames(ann.row), rownames(ann.row)]
-# pdf("Heatmap.cluster.distace.pdf", 5, 4)
-# pheatmap(dist.clusters,
-#     color = colorRampPalette(c("red", "White", "blue"))(100),
-#     annotation_row = ann.row,
-#     annotation_col = ann.row,
-#     cluster_rows = FALSE, cluster_cols = FALSE,
-#     method = "ward.D2",
-#     annotation_color = mycolor
-# )
+table(proj_Epi$Sample)
+proj_Epi@reducedDims$Harmony$params[3]
+proj_Epi@reducedDims$IterativeLSI_merge$useMatrix
+proj_Epi@embeddings$UMAP$params
 
-## 4.3. scCNV for Epi clusters ----
+pdf("Harmony.converge.pdf", 5, 4)
+proj_Epi <- addHarmony(
+    ArchRProj = proj_Epi,
+    reducedDims = "IterativeLSI_merge",
+    name = "Harmony",
+    groupBy = "Sample",
+    plot_convergence = TRUE,
+    force = TRUE
+)
+dev.off()
+
+proj_Epi <- addUMAP(
+    ArchRProj = proj_Epi, reducedDims = "Harmony",
+    name = "UMAP_Harmony",
+    nNeighbors = 30, minDist = 0.4,
+    metric = "cosine",
+    force = TRUE
+)
+
+proj_Epi <- addClusters(
+    input = proj_Epi,
+    reducedDims = "Harmony",
+    dimsToUse = 1:25,
+    knnAssign = 6,
+    maxClusters = 50,
+    method = "Seurat",
+    name = "Clusters_Harmony",
+    force = TRUE
+)
+sample.info.epi <- proj_Epi@cellColData %>% as.data.frame()
+
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    name = "Clusters_Harmony", embedding = "UMAP_Harmony",
+    # pal = mycolor,
+    size = 0.2, plotAs = "points"
+)
+
+pdf("UMAP.Harmony.Epi.Clusters_Harmony.pdf", 7, 7)
+plot(p)
+dev.off()
+
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    name = "Clusters_2", embedding = "UMAP_Harmony",
+    pal = mycolor,
+    size = 0.2, plotAs = "points"
+)
+
+pdf("UMAP.Harmony.Epi.Clusters_2.pdf", 7, 7)
+plot(p)
+dev.off()
+
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    name = "Clusters_type", embedding = "UMAP_Harmony",
+    size = 0.2, plotAs = "points"
+)
+pdf("UMAP.Harmony.Epi.Clusters_type.pdf", 7, 7)
+plot(p)
+dev.off()
+
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    name = "Sample_2", embedding = "UMAP_Harmony",
+    size = 0.2, plotAs = "points",
+    labelMeans = FALSE
+)
+pdf("UMAP.Harmony.Epi.Sample.pdf", 7, 7)
+plot(p)
+dev.off()
+
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    name = "new_location", embedding = "UMAP_Harmony",
+    size = 0.2, plotAs = "points"
+)
+
+pdf("UMAP.Harmony.Epi.new_location.pdf", 7, 7)
+plot(p)
+dev.off()
+
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    name = "Type_location", embedding = "UMAP_Harmony",
+    size = 0.2, plotAs = "points"
+)
+
+pdf("UMAP.Harmony.Epi.Type_location.pdf", 7, 7)
+plot(p)
+dev.off()
+
+AMI.cluster.harmony <- c(
+    Normal = aricode::AMI(
+        sample.info.epi %>% filter(Epi_type == "Normal") %>% pull(Clusters_Harmony),
+        sample.info.epi %>% filter(Epi_type == "Normal") %>% pull(Sample)
+    ),
+    Adenoma = aricode::AMI(
+        sample.info.epi %>% filter(Epi_type == "Adenoma") %>% pull(Clusters_Harmony),
+        sample.info.epi %>%
+            filter(Epi_type == "Adenoma") %>%
+            pull(Sample)
+    ),
+    Malignant = aricode::AMI(
+        sample.info.epi %>% filter(Epi_type == "Malignant") %>% pull(Clusters_Harmony),
+        sample.info.epi %>% filter(Epi_type == "Malignant") %>% pull(Sample)
+    )
+)
+AMI.cluster
+AMI.cluster.harmony
+
+## 4.3. nClusters and resolution ----
+resolutions <- seq(0.1, 2, 0.05)
+nClusters <- data.frame(
+    "resolutions" = resolutions,
+    "Total" = 0,
+    "Normal" = 0,
+    "Adenoma" = 0,
+    "Malignant" = 0
+)
+
+one <- 1
+for (one in seq_len(nrow(nClusters))) {
+    proj_Epi <- addClusters(
+        input = proj_Epi,
+        reducedDims = "IterativeLSI_merge",
+        dimsToUse = 1:25,
+        knnAssign = 6,
+        maxClusters = 50,
+        method = "Seurat",
+        name = "Clusters_test",
+        resolution = nClusters$resolutions[one],
+        force = TRUE
+    )
+    temp <- table(proj_Epi$Clusters_test, proj_Epi$Epi_type)
+    temp <- colnames(temp)[apply(temp, 1, which.max)]
+
+    nClusters[one, "Total"] <- length(temp)
+    nClusters[one, "Normal"] <- sum(temp == "Normal")
+    nClusters[one, "Adenoma"] <- sum(temp == "Adenoma")
+    nClusters[one, "Malignant"] <- sum(temp == "Malignant")
+}
+nClusters <- nClusters %>% mutate(Total = Normal + Adenoma + Malignant)
+saveRDS(nClusters, "nClusters.rds")
+
+pdf("Dot.resolution.nClusters.pdf", 5, 3)
+ggplot(nClusters %>% filter(resolutions <= 1.15), aes(x = resolutions)) +
+    geom_line(aes(y = Total, color = "Total")) +
+    geom_line(aes(y = Normal, color = "Normal")) +
+    geom_line(aes(y = Adenoma, color = "Adenoma")) +
+    geom_line(aes(y = Malignant, color = "Malignant")) +
+    geom_point(aes(y = Total, color = "Total")) +
+    geom_point(aes(y = Normal, color = "Normal")) +
+    geom_point(aes(y = Adenoma, color = "Adenoma")) +
+    geom_point(aes(y = Malignant, color = "Malignant")) +
+    scale_color_manual(values = c(
+        "Total" = "#5e2953", "Normal" = "#208a42",
+        "Adenoma" = "#d51f26", "Malignant" = "#272d6a"
+    )) +
+    geom_hline(yintercept = c(25, 2), linetype = "dashed") +
+    geom_vline(xintercept = 0.5, linetype = "dashed") +
+    ylab("Number of clusters") +
+    scale_y_continuous(breaks = c(0, 2, 10, 20, 25, 30), labels = c(0, 2, 10, 20, 25, 30)) +
+    scale_x_continuous(breaks = seq(0, 1.1, 0.1), labels = seq(0, 1.1, 0.1)) +
+    theme_classic()
+dev.off()
+
+## 4.4. correlation of epithlium clusters ----
+mycolor$Cell_Type <- c("Normal" = "#208a42", "Adenoma" = "#d51f26", "Malignant" = "#272d6a")
+sePeaks <- getGroupSE(
+    ArchRProj = proj_Epi,
+    useMatrix = "PeakMatrix",
+    groupBy = "Clusters",
+    divideN = TRUE,
+    scaleTo = NULL
+)
+ann.row <- data.frame(
+    row.names = colnames(sePeaks@assays@data$PeakMatrix),
+    "Cell_Type" = rep("Malignant", ncol(sePeaks@assays@data$PeakMatrix)),
+    "test" = 0
+)
+ann.row[c("C3", "C4"), ]$Cell_Type <- "Normal"
+ann.row[c("C28", "C9"), ]$Cell_Type <- "Adenoma"
+ann.row$Cell_Type <- factor(ann.row$Cell_Type,
+    levels = c("Normal", "Adenoma", "Malignant")
+)
+ann.row <- ann.row[order(ann.row$Cell_Type), ]
+ann.row$test <- NULL
+
+dist.clusters <- dist(t(sePeaks@assays@data$PeakMatrix))
+dist.clusters <- as.matrix(dist.clusters)
+dist.clusters <- dist.clusters[rownames(ann.row), rownames(ann.row)]
+pdf("Heatmap.cluster.distace.pdf", 5, 4)
+pheatmap(dist.clusters,
+    color = colorRampPalette(c("red", "White", "blue"))(100),
+    annotation_row = ann.row,
+    annotation_col = ann.row,
+    cluster_rows = FALSE, cluster_cols = FALSE,
+    method = "ward.D2",
+    annotation_color = mycolor
+)
+
+## 4.5. scCNV for Epi clusters ----
 load("CRC_CNV.rda")
 proj_Epi$Epi_type <- "Malignant"
 proj_Epi$Epi_type[proj_Epi$Clusters %in% c("C3", "C4")] <- "Normal"
 proj_Epi$Epi_type[proj_Epi$Clusters %in% c("C28", "C9")] <- "Adenoma"
 
-sample.info.epi <- proj_Epi@cellColData %>% as.data.frame()
 table(proj_Epi$Epi_type)
 
 anno.row <- sample.info.epi %>%
@@ -406,7 +595,6 @@ names(anno.color$seqnames) <- paste("chr", 1:22, sep = "")
 anno.color$Clusters
 
 dir.create("Epi_By_Cluster")
-one <- "C1"
 for (one in unique(proj_Epi$Clusters)) {
     print(one)
     cell.select <- rownames(sample.info.epi)[sample.info.epi$Clusters == one]
@@ -432,7 +620,6 @@ sample.info.epi$Epi_type <- factor(sample.info.epi$Epi_type,
     levels = c("Normal", "Adenoma", "Malignant")
 )
 
-one <- "COAD18"
 for (one in unique(proj_Epi$Sample)) {
     print(one)
     cell.select <- rownames(sample.info.epi)[sample.info.epi$Sample == one]
