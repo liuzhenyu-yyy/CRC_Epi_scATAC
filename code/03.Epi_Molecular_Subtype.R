@@ -152,6 +152,7 @@ sePeaks <- getGroupSE(
     divideN = TRUE,
     scaleTo = NULL
 )
+saveRDS(sePeaks, "sePeaks.cluster.rds")
 
 write.csv(as.data.frame(colData(sePeaks)), "cluster.info.all.csv")
 sample.selected <- setdiff(rownames(sePeaks@colData), c("C3", "C4", "C28", "C9"))
@@ -1171,6 +1172,209 @@ plot(v, doWeights = FALSE, show = list(Faces = FALSE))
 dev.off()
 intersect(TF.Absea, Down.gene)
 
+# 6. TF enrichment in each patient ----
+dir.create("Cluster_level")
+cluster.info$iCMS <- ifelse(cluster.info$Epi_Group == "Group_1", "iCMS3", "iCMS2")
+
+## 6.1 identify diff peaks in each cluster & run Homers ----
+table(proj_Epi$Clusters)
+dir.create("diff_peak_cluster")
+dir.create("diff_peak_cluster/bed")
+dir.create("diff_peak_cluster/down")
+
+for (one in rownames(cluster.info)) {
+    marker.peak.one <- getMarkerFeatures(
+        ArchRProj = proj_Epi,
+        useMatrix = "PeakMatrix",
+        groupBy = "Clusters",
+        testMethod = "wilcoxon",
+        bias = c("TSSEnrichment", "log10(nFrags)"),
+        useGroups = one,
+        bgdGroups = c("C3", "C4")
+    )
+
+    # up peak data frame
+    marker.peak.one.df <- getMarkers(marker.peak.one,
+        cutOff = "FDR <= 0.01 & Log2FC >= 1"
+    )[[1]] %>% as.data.frame()
+    write.table(
+        marker.peak.one.df,
+        paste0("diff_peak_cluster/marker.peak.tumor.", one, ".tsv"),
+        col.names = TRUE,
+        sep = "\t", quote = FALSE, row.names = FALSE
+    )
+
+    # up peak bed file
+    marker.peak.one.df <- marker.peak.one.df %>%
+        select(seqnames, start, end) %>%
+        mutate(
+            id = paste(seqnames, start, end, sep = "_"),
+            length = 500,
+            strand = "."
+        )
+    write.table(
+        marker.peak.one.df,
+        paste0("diff_peak_cluster/bed/marker.peak.tumor.", one, ".bed"),
+        col.names = FALSE,
+        sep = "\t", quote = FALSE, row.names = FALSE
+    )
+
+    # down peak data frame
+    marker.peak.one.df <- getMarkers(marker.peak.one,
+        cutOff = "FDR <= 0.01 & Log2FC <= -1"
+    )[[1]] %>% as.data.frame()
+    write.table(
+        marker.peak.one.df,
+        paste0("diff_peak_cluster/down/marker.peak.tumor.", one, ".tsv"),
+        col.names = TRUE,
+        sep = "\t", quote = FALSE, row.names = FALSE
+    )
+}
+rm(one, marker.peak.one.df, marker.peak.one)
+
+# find motifs in each patient
+# sh Run.Homer.Motif.sh
+
+peaks.clusters.up <- sapply(rownames(cluster.info), function(one) {
+    temp <- read.table(paste0("diff_peak_cluster/marker.peak.tumor.", one, ".tsv"),
+        header = TRUE, sep = "\t", stringsAsFactors = FALSE
+    )
+    return(paste(temp$seqnames, temp$start, temp$end, sep = "_"))
+})
+peaks.clusters.down <- sapply(rownames(cluster.info), function(one) {
+    temp <- read.table(paste0("diff_peak_cluster/down/marker.peak.tumor.", one, ".tsv"),
+        header = TRUE, sep = "\t", stringsAsFactors = FALSE
+    )
+    return(paste(temp$seqnames, temp$start, temp$end, sep = "_"))
+})
+identical(names(peaks.clusters.up), rownames(cluster.info))
+identical(names(peaks.clusters.down), rownames(cluster.info))
+
+cluster.info$nPeak_Up <- sapply(peaks.clusters.up, length)
+cluster.info$nPeak_Down <- sapply(peaks.clusters.down, length)
+cluster.info$Cluster <- rownames(cluster.info)
+
+pdf("Cluster_level/Barplot.diff_peak.pdf", 7, 3)
+cluster.info %>%
+    arrange(-nPeak_Up) %>%
+    mutate(Cluster = factor(Cluster, levels = Cluster)) %>%
+    mutate(label = as.character(round(nPeak_Up / nPeak_Down, 2))) %>%
+    ggplot() +
+    geom_bar(aes(x = Cluster, y = nPeak_Up, fill = "Gained"),
+        stat = "identity"
+    ) +
+    geom_bar(aes(x = Cluster, y = -nPeak_Down, fill = "Lost"),
+        stat = "identity"
+    ) +
+    # geom_text(aes(x = Cluster, y = nPeak_Up + 3000, label = label), size = 2) +
+    facet_grid(cols = vars(iCMS), scales = "free", space = "free") +
+    scale_fill_manual(values = c("Gained" = "#cd2525", "Lost" = "#1774cd")) +
+    ylab("Number of peaks") +
+    theme_classic() +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+dev.off()
+
+## 6.2 compare cluster peaks ----
+plot.data <- matrix(0, nrow = length(peaks.clusters.up), ncol = length(peaks.clusters.up))
+rownames(plot.data) <- colnames(plot.data) <- rownames(cluster.info)
+
+Jaccard_Sim <- function(x, y) {
+    x <- unique(x)
+    y <- unique(y)
+    return(length(intersect(x, y)) / length(union(x, y)))
+}
+
+for (i in seq_len(length(peaks.clusters.up))) {
+    for (j in seq_len(length(peaks.clusters.up))) {
+        plot.data[i, j] <- Jaccard_Sim(peaks.clusters.up[[i]], peaks.clusters.up[[j]])
+    }
+}
+
+diag(plot.data) <- NA
+anno.col <- cluster.info %>%
+    select(c("iCMS"))
+colnames(anno.col) <- names(mycolor)[c(1:4)]
+mycolor$iCMS <- c("iCMS2" = "#283891", "iCMS3" = "#62b7e6")
+
+pdf("Cluster_level/Heatmap.Jaccard.peak.up.pdf", 5, 4)
+pheatmap(plot.data[order(anno.col$iCMS), order(anno.col$iCMS)],
+    annotation_col = anno.col,
+    annotation_row = anno.col,
+    cluster_rows = FALSE, cluster_cols = FALSE,
+    annotation_colors = mycolor[colnames(anno.col)],
+    gaps_row = 15, gaps_col = 15,
+    border_color = NA,
+)
+dev.off()
+
+iCMS2.up <- union(marker.peak.list$Group_1, marker.peak.list$Both) %>%
+    intersect(do.call(c, peaks.clusters.up[cluster.info$iCMS == "iCMS2"]))
+temp <- table(do.call(c, peaks.clusters.up[cluster.info$iCMS == "iCMS2"]))[iCMS2.up]
+hist(temp)
+sum(temp >= 5)
+
+## 6.3 accessibility heatmap ----
+sePeaks <- readRDS("sePeaks.cluster.rds")
+cluster.info$iCMS <- ifelse(cluster.info$Epi_Group == "Group_1", "iCMS3", "iCMS2")
+
+PeakMatrix <- sePeaks@assays@data$PeakMatrix
+
+rownames(PeakMatrix) <- sePeaks@elementMetadata %>%
+    as.data.frame() %>%
+    mutate(name = paste(seqnames, start, end, sep = "_")) %>%
+    pull(name)
+
+plot.data <- PeakMatrix[
+    c(marker.peak.list$Group_2, marker.peak.list$Both, marker.peak.list$Group_1),
+    c("C3", "C4", rownames(cluster.info))
+]
+plot.data <- apply(plot.data, 1, function(x) {
+    x <- (x - mean(x)) / sd(x)
+    return(x)
+}) %>% t()
+plot.data[plot.data > 1.5] <- 1.5
+plot.data[plot.data < (-1.5)] <- -1.5
+
+names(marker.peak.list)
+anno.row <- data.frame(
+    row.names = rownames(plot.data),
+    Group = factor(rep(c("iCMS2", "Both", "iCMS3"),
+        times = c(length(marker.peak.list$Group_2), length(marker.peak.list$Both), length(marker.peak.list$Group_1))
+    ), levels = c("iCMS2", "Both", "iCMS3")),
+    Peak = "Up"
+)
+# anno.row <- anno.row[order(anno.row$Group, rowMeans(plot.data[, 18:27]) - rowMeans(plot.data[, 3:17])), ]
+anno.row <- anno.row[order(anno.row$Group, rnorm(nrow(plot.data))), ]
+
+ann.col <- data.frame(
+    row.names = colnames(plot.data),
+    iCMS = factor(c("Normal", "Normal", cluster.info$iCMS), levels = c("Normal", "iCMS2", "iCMS3")),
+    temp = "temp"
+)
+
+# ann.col <- ann.col[order(ann.col$iCMS, rnorm(ncol(plot.data))), ]
+ann.col <- ann.col[order(ann.col$iCMS, colSums(plot.data)), ]
+plot.data <- plot.data[row.names(anno.row), rownames(ann.col)]
+
+png("Cluster_level/Heatmap.marker.tmuor.cluster.Up.png", 400, 600)
+pheatmap(plot.data,
+    # color = colorRampPalette(rev(brewer.pal(n = 9, name = "RdYlBu")[2:8]))(100),
+    scale = "none",
+    annotation_row = anno.row %>% select(Group),
+    annotation_col = ann.col %>% select(iCMS),
+    annotation_colors = list(
+        Group = c(iCMS3 = "#62b7e6", iCMS2 = "#283891", Both = "#86d786"),
+        iCMS = c("Normal" = "#208a42", "iCMS2" = "#283891", "iCMS3" = "#62b7e6")
+    ),
+    cluster_rows = FALSE,
+    cluster_cols = FALSE,
+    show_rownames = FALSE,
+    gaps_col = c(2, 17),
+    gaps_row = c(length(marker.peak.list$Group_2), length(marker.peak.list$Group_2) + length(marker.peak.list$Both))
+)
+dev.off()
+
+gc()
 write.csv(cluster.info, "cluster.info.csv")
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 save.image("Epi_Molecular_Subtype.RData")

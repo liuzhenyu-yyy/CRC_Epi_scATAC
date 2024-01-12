@@ -377,7 +377,60 @@ for (one in c("CIMP_High", "CIMP_Low", "CIMP_Negative")) {
 }
 rm(one, p, plot.data, plot.data1, plot.data2, peakset)
 
-## 3.3. functional enrichment ----
+## 3.3 cluster-level heatmap of marker peaks ----
+peaks <- sapply(marker.peak.up.list, names) %>%
+    do.call(c, .) %>%
+    unique()
+
+sePeaks <- readRDS("../03.Epi_Molecular_Subtype/sePeaks.cluster.rds")
+PeakMatrix <- sePeaks@assays@data$PeakMatrix
+rownames(PeakMatrix) <- sePeaks@elementMetadata %>%
+    as.data.frame() %>%
+    mutate(name = paste(seqnames, start, end, sep = "_")) %>%
+    pull(name)
+
+table(peaks %in% rownames(PeakMatrix))
+
+plot.data <- PeakMatrix[
+    peaks,
+    c("C3", "C4", rownames(cluster.info))
+]
+
+plot.data <- apply(plot.data, 1, function(x) {
+    x <- (x - mean(x)) / sd(x)
+    return(x)
+}) %>% t()
+plot.data[plot.data > 1.5] <- 1.5
+plot.data[plot.data < (-1.5)] <- -1.5
+
+ann.col <- data.frame(
+    row.names = colnames(plot.data),
+    CIMP_Group = factor(c("Normal", "Normal", cluster.info$CIMP_Group),
+        levels = c("Normal", "CIMP_High", "CIMP_Low", "CIMP_Negative")
+    ),
+    temp = "temp"
+)
+
+# ann.col <- ann.col[order(ann.col$iCMS, rnorm(ncol(plot.data))), ]
+ann.col <- ann.col[order(ann.col$CIMP_Group, colSums(plot.data)), ]
+plot.data <- plot.data[, rownames(ann.col)]
+
+png("Heatmap.marker.CIMP.cluster.Up.png", 600, 300)
+pheatmap(t(plot.data),
+    # color = colorRampPalette(rev(brewer.pal(n = 9, name = "RdYlBu")[2:8]))(100),
+    scale = "none",
+    annotation_row = ann.col %>% select(CIMP_Group),
+    annotation_colors = list(
+        CIMP_Group = c("Normal" = "#208a42", mycolor$CIMP_Group)
+    ),
+    cluster_rows = FALSE,
+    cluster_cols = FALSE,
+    show_colnames = FALSE,
+    gaps_row = c(2, 8, 19)
+)
+dev.off()
+
+## 3.4. functional enrichment ----
 marker.peak2gene.list <- lapply(
     marker.peak.list,
     function(x) {

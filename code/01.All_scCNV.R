@@ -539,42 +539,7 @@ ggplot(nClusters %>% filter(resolutions <= 1.15), aes(x = resolutions)) +
     theme_classic()
 dev.off()
 
-## 4.4. correlation of epithlium clusters ----
-mycolor$Cell_Type <- c("Normal" = "#208a42", "Adenoma" = "#d51f26", "Malignant" = "#272d6a")
-sePeaks <- getGroupSE(
-    ArchRProj = proj_Epi,
-    useMatrix = "PeakMatrix",
-    groupBy = "Clusters",
-    divideN = TRUE,
-    scaleTo = NULL
-)
-ann.row <- data.frame(
-    row.names = colnames(sePeaks@assays@data$PeakMatrix),
-    "Cell_Type" = rep("Malignant", ncol(sePeaks@assays@data$PeakMatrix)),
-    "test" = 0
-)
-ann.row[c("C3", "C4"), ]$Cell_Type <- "Normal"
-ann.row[c("C28", "C9"), ]$Cell_Type <- "Adenoma"
-ann.row$Cell_Type <- factor(ann.row$Cell_Type,
-    levels = c("Normal", "Adenoma", "Malignant")
-)
-ann.row <- ann.row[order(ann.row$Cell_Type), ]
-ann.row$test <- NULL
-
-dist.clusters <- dist(t(sePeaks@assays@data$PeakMatrix))
-dist.clusters <- as.matrix(dist.clusters)
-dist.clusters <- dist.clusters[rownames(ann.row), rownames(ann.row)]
-pdf("Heatmap.cluster.distace.pdf", 5, 4)
-pheatmap(dist.clusters,
-    color = colorRampPalette(c("red", "White", "blue"))(100),
-    annotation_row = ann.row,
-    annotation_col = ann.row,
-    cluster_rows = FALSE, cluster_cols = FALSE,
-    method = "ward.D2",
-    annotation_color = mycolor
-)
-
-## 4.5. scCNV for Epi clusters ----
+# 5. scCNV for Epi clusters ----
 load("CRC_CNV.rda")
 proj_Epi$Epi_type <- "Malignant"
 proj_Epi$Epi_type[proj_Epi$Clusters %in% c("C3", "C4")] <- "Normal"
@@ -667,7 +632,116 @@ dev.off()
 
 plot(colorRampPalette(rev(brewer.pal(9, "RdBu")))(100))
 
-# 5. TF deviation heatmap ----
+# 6. marker peak for each type ----
+## 6.1 identify marker peaks ----
+table(proj_Epi$Clusters)
+table(proj_Epi$Epi_type)
+
+markersPeaks <- getMarkerFeatures(
+    ArchRProj = proj_Epi,
+    useMatrix = "PeakMatrix",
+    groupBy = "Epi_type",
+    bias = c("TSSEnrichment", "log10(nFrags)"),
+    testMethod = "wilcoxon"
+)
+markerList <- getMarkers(markersPeaks, cutOff = "FDR <= 0.001 & Log2FC >= 1")
+marker.list <- sapply(markerList, function(x) {
+    x <- x %>%
+        as.data.frame() %>%
+        mutate(name = paste(seqnames, start, end, sep = "_")) %>%
+        pull(name)
+    return(x)
+})
+sapply(marker.list, length)
+
+temp <- unlist(marker.list)  %>% table()
+dup <- names(temp)[temp > 1]
+marker.list <- sapply(marker.list, function(x) {
+    x <- x[!(x %in% dup)]
+    return(x)
+})
+
+## 6.2 heatmap of each clusters ----
+proj_Epi$Sample_Type <- paste(proj_Epi$Sample, proj_Epi$Epi_type, sep = "_")
+
+sePeaks <- getGroupSE(
+    ArchRProj = proj_Epi,
+    useMatrix = "PeakMatrix",
+    groupBy = "Sample_Type",
+    divideN = TRUE,
+    scaleTo = NULL
+)
+saveRDS(sePeaks, "sePeaks.Sample_Type.rds")
+sePeaks <- readRDS("sePeaks.Sample_Type.rds")
+
+selected <- table(proj_Epi$Sample_Type)
+selected <- names(selected)[selected > 10]
+selected <- setdiff(selected, "COAD09_Adenoma")
+
+# sePeaks <- readRDS("../03.Epi_Molecular_Subtype/sePeaks.cluster.rds")
+PeakMatrix <- sePeaks@assays@data$PeakMatrix
+
+rownames(PeakMatrix) <- sePeaks@elementMetadata %>%
+    as.data.frame() %>%
+    mutate(name = paste(seqnames, start, end, sep = "_")) %>%
+    pull(name)
+
+table(c(marker.list$Normal, marker.list$Adenoma, marker.list$Malignant) %in% rownames(PeakMatrix))
+
+plot.data <- PeakMatrix[
+    c(marker.list$Normal, marker.list$Adenoma, marker.list$Malignant),
+    selected
+]
+
+plot.data <- apply(plot.data, 1, function(x) {
+    x <- (x - mean(x)) / sd(x)
+    return(x)
+}) %>% t()
+
+plot.data[plot.data > 1.5] <- 1.5
+plot.data[plot.data < (-1.5)] <- -1.5
+
+names(marker.list)
+anno.row <- data.frame(
+    row.names = rownames(plot.data),
+    Group = factor(rep(c("Normal", "Adenoma", "Malignant"),
+        times = c(length(marker.list$Normal), length(marker.list$Adenoma), length(marker.list$Malignant))
+    ), levels = c("Normal", "Adenoma", "Malignant")),
+    Peak = "Up"
+)
+# anno.row <- anno.row[order(anno.row$Group, rowMeans(plot.data[, 18:27]) - rowMeans(plot.data[, 3:17])), ]
+
+ann.col <- data.frame(
+    row.names = colnames(plot.data),
+    Epi_Type = gsub("^.+?_", "", colnames(plot.data)),
+    temp = rep("temp", length(colnames(plot.data)))
+)
+ann.col$Epi_Type <- factor(ann.col$Epi_Type, levels = c("Normal", "Adenoma", "Malignant"))
+
+ann.col <- ann.col[order(ann.col$Epi_Type, rnorm(ncol(plot.data))), ]
+# ann.col <- ann.col[order(ann.col$Epi_Type, colSums(plot.data)), ]
+plot.data <- plot.data[row.names(anno.row), rownames(ann.col)]
+
+png("Heatmap.marker.Epi_Type.patient.Up.png", 800, 800)
+pheatmap(plot.data,
+    # color = colorRampPalette(rev(brewer.pal(n = 9, name = "RdYlBu")[2:8]))(100),
+    scale = "none",
+    annotation_row = anno.row %>% select(Group),
+    annotation_col = ann.col %>% select(Epi_Type),
+    annotation_colors = list(
+        Group = c(Normal = "#208a42", Adenoma = "#d51f26", Malignant = "#272d6a"),
+        Epi_Type = c(Normal = "#208a42", Adenoma = "#d51f26", Malignant = "#272d6a")
+    ),
+    cluster_rows = FALSE,
+    cluster_cols = FALSE,
+    show_rownames = FALSE,
+    show_colnames = FALSE,
+    gaps_row = c(length(marker.list$Normal), length(marker.list$Normal) + length(marker.list$Adenoma)),
+    gaps_col = c(28, 35)
+)
+dev.off()
+
+# 7. TF deviation heatmap ----
 plot.data <- data.table::fread("T-AD-C-specific_heatmap_data.csv") %>%
     as.data.frame()
 
