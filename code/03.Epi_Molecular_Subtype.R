@@ -497,7 +497,8 @@ patchwork::wrap_plots(plotlist = p, nrow = 2, ncol = 5, byrow = TRUE)
 dev.off()
 
 lapply(markers.iCMS, length)
-# 4. differential peak analysis ----
+
+# 4. differential peak of iCMS ----
 ## 4.1. identify diff peaks ----
 # call diff peaks
 table(proj_Epi$Epi_Group)
@@ -869,7 +870,7 @@ ggplot(plot.data) +
 dev.off()
 rm(plot.data, GREAT.marker.list, GO.marker.list)
 
-# 5. TF enrichment in marker peaks ----
+# 5. TF enrichment in iCMS marker peaks ----
 dir.create("TF_motif")
 ## 5.1. run HOMER ----
 # findMotifsGenome.pl bed/marker.peak.tumor.Group_1.specific.bed hg38 homer/Group_1 -size 200
@@ -1045,6 +1046,14 @@ pheatmap(t(FC.mat[TF.selected, ]),
 )
 dev.off()
 
+TF.selected <- c(
+    "NRF2", "MAFB",
+    "MAFK", "FOXA3", "FOXA2", "FOXM1", "SOX2", "SOX4",
+    "ELF1", "EHF", "ETS1",
+    "AP-1", "LEF1", "TCF3",
+    "NUR77", "HNF1", "CDX2", "PPARA", "TR4", "HNF4A"
+)
+
 TF.selected <- setdiff(TF.selected, "CTCF")
 plot.data <- lapply(homer.res, function(x) {
     x <- x[x$TF %in% TF.selected, ]
@@ -1054,10 +1063,10 @@ plot.data <- lapply(homer.res, function(x) {
 plot.data$Group <- factor(plot.data$Group, levels = c("Group_2", "Common", "Group_1"))
 plot.data$TF <- factor(plot.data$TF, levels = (TF.selected))
 
-plot.data[plot.data$log.p.value > 1000, ]$log.p.value <- 1000
+plot.data[plot.data$log.p.value > 500, ]$log.p.value <- 500
 #plot.data[plot.data$Log2_Enrichment > 3, ]$Log2_Enrichment <- 3
 
-pdf("TF_motif/Dot.motif.sig.selected1.pdf", 4, 4)
+pdf("TF_motif/Dot.motif.sig.selected.pdf", 4, 4)
 ggplot(plot.data) +
     geom_point(aes(
         x = Group, y = TF,
@@ -1172,11 +1181,12 @@ plot(v, doWeights = FALSE, show = list(Faces = FALSE))
 dev.off()
 intersect(TF.Absea, Down.gene)
 
-# 6. TF enrichment in each patient ----
+# 6. Cluster-level analysis ----
 dir.create("Cluster_level")
 cluster.info$iCMS <- ifelse(cluster.info$Epi_Group == "Group_1", "iCMS3", "iCMS2")
+mycolor$iCMS <- c("iCMS2" = "#283891", "iCMS3" = "#62b7e6")
 
-## 6.1 identify diff peaks in each cluster & run Homers ----
+## 6.1 diff peaks in each cluster & run Homers ----
 table(proj_Epi$Clusters)
 dir.create("diff_peak_cluster")
 dir.create("diff_peak_cluster/bed")
@@ -1310,10 +1320,9 @@ dev.off()
 iCMS2.up <- union(marker.peak.list$Group_1, marker.peak.list$Both) %>%
     intersect(do.call(c, peaks.clusters.up[cluster.info$iCMS == "iCMS2"]))
 temp <- table(do.call(c, peaks.clusters.up[cluster.info$iCMS == "iCMS2"]))[iCMS2.up]
-hist(temp)
-sum(temp >= 5)
+rm(iCMS2.up, temp, peaks.clusters.up, peaks.clusters.down, plot.data, anno.col)
 
-## 6.3 accessibility heatmap ----
+## 6.3 cluster level heatmap ----
 sePeaks <- readRDS("sePeaks.cluster.rds")
 cluster.info$iCMS <- ifelse(cluster.info$Epi_Group == "Group_1", "iCMS3", "iCMS2")
 
@@ -1372,6 +1381,506 @@ pheatmap(plot.data,
     gaps_col = c(2, 17),
     gaps_row = c(length(marker.peak.list$Group_2), length(marker.peak.list$Group_2) + length(marker.peak.list$Both))
 )
+dev.off()
+rm(plot.data, anno.row, ann.col, PeakMatrix)
+
+## 6.4 cluster-wise TF enrichment ----
+homer.res.cluster <- list()
+
+sapply(rownames(cluster.info), function(one) {
+    homer.res <- homer.parser(paste0("homer/Cluster/", one, "/knownResults.txt"))
+    homer.res$Cluster <- one
+    homer.res.cluster[[one]] <<- homer.res
+    return(1)
+})
+sapply(homer.res.cluster, dim)
+
+homer.res.cluster <- do.call(rbind, homer.res.cluster)
+table(homer.res.cluster$Cluster)
+
+# iCMS TFs
+TF.selected <- c("HNF4A", "PPARA", "NUR77", "HNF1", "TR4", "SOX4", "SOX2", "MAFB", "MAFK", "FOXA2", "FOXA3")
+
+plot.data <- homer.res.cluster %>%
+    filter(TF %in% TF.selected) %>%
+    mutate(
+        iCMS = cluster.info[.$Cluster, "iCMS"],
+        CIMP_Group = cluster.info[.$Cluster, "CIMP_Group"],
+        MSI_Status = cluster.info[.$Cluster, "MSI_Status_Major"]
+    )
+
+plot.data$Cluster <- factor(plot.data$Cluster, levels = unique(plot.data$Cluster))
+plot.data$TF <- factor(plot.data$TF, levels = TF.selected)
+plot.data$Group <- ifelse(plot.data$TF %in% c("HNF4A", "PPARA", "NUR77", "HNF1", "TR4"), "iCMS2 TF", "iCMS3 TF")
+if (max(plot.data$log.p.value) > 500) {
+    plot.data[plot.data$log.p.value > 500, ]$log.p.value <- 500
+}
+
+pdf("Cluster_level/Dot.TF.iCMS.cluster.pdf", 5, 6)
+ggplot(plot.data) +
+    geom_point(aes(
+        x = TF, y = Cluster,
+        fill = log.p.value, size = Log2_Enrichment
+    ), pch = 21) +
+    scale_fill_viridis_c() +
+    facet_grid(
+        rows = vars(iCMS),
+        cols = vars(Group),
+        scales = "free", space = "free"
+    ) +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+dev.off()
+
+rm(p, plot.data, i, gene.selected)
+
+# 7. TF and intra-subtype heterogeneity ----
+
+## 7.1. get data: diff peak & motif match ----
+# significant peaks of each clusters
+peaks.clusters <- list()
+sapply(rownames(cluster.info), function(one) {
+    temp <- read.table(paste0("diff_peak_cluster/marker.peak.tumor.", one, ".tsv"), header = TRUE) %>%
+        mutate(
+            id = paste(seqnames, start, end, sep = "_")
+        )
+    peaks.clusters[[one]] <<- temp$id
+    return(1)
+})
+sapply(peaks.clusters, length)
+
+# motif match matrix
+motif.match <- getMatches(ArchRProj = proj_Epi, name = "Motif")
+temp <- rowRanges(motif.match)
+motif.match <- motif.match@assays@data$matches
+
+rownames(motif.match) <- paste(seqnames(temp), start(temp), end(temp), sep = "_")
+colnames(motif.match) <- gsub("_.+?$", "", colnames(motif.match))
+motif.match[1:5, 1:5]
+rm(temp)
+
+## 7.2. plot diff peak with motif in each cluster ----
+peaks.common <- list()
+sapply(peaks.common, length)
+# Group2 TFs: HNF4A, PPARA
+cluster.selected <- cluster.info %>%
+    filter(Epi_Group == "Group_2") %>%
+    rownames()
+
+# HNF4A
+peak.selected <- motif.match[, "HNF4A"] %>%
+    .[.] %>%
+    names() %>%
+    intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
+length(peak.selected) # 20059 HNF4A peaks
+
+plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
+rownames(plot.data) <- peak.selected
+colnames(plot.data) <- cluster.selected
+for (one in cluster.selected) {
+    plot.data[peak.selected %in% peaks.clusters[[one]], one] <- 1
+}
+
+pdf("Cluster_level/Heatmap.HNF4A.clusterPeaks1.pdf", 10, 6)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
+        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_color = mycolor,
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 17
+)
+dev.off()
+
+temp <- cutree(p$tree_col, 17)
+rowSums(plot.data[names(temp), ]) %>%
+    aggregate(., by = list(temp), FUN = mean) # 4 and 15
+peaks.common[["HNF4A"]] <- names(temp)[temp %in% c(4, 15)]
+
+anno.col <- data.frame(
+    row.names = rownames(plot.data),
+    "con" = ifelse(rownames(plot.data) %in% peaks.common[["HNF4A"]], "Consensus", "Specific")
+)
+
+pdf("Cluster_level/Heatmap.HNF4A.clusterPeaks.pdf", 10, 6)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
+        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_col = anno.col,
+    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 17
+)
+dev.off()
+
+# PPARA
+peak.selected <- motif.match[, "PPARA"] %>%
+    .[.] %>%
+    names() %>%
+    intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
+length(peak.selected) # 9720 HNF4A peaks
+
+plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
+rownames(plot.data) <- peak.selected
+colnames(plot.data) <- cluster.selected
+for (one in cluster.selected) {
+    plot.data[peak.selected %in% peaks.clusters[[one]], one] <- 1
+}
+
+pdf("Cluster_level/Heatmap.PPARA.clusterPeaks.pdf", 10, 6)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
+        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_color = mycolor,
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 15
+)
+dev.off()
+
+temp <- cutree(p$tree_col, 15)
+rowSums(plot.data[names(temp), ]) %>%
+    aggregate(., by = list(temp), FUN = mean) # 1 and 4
+peaks.common[["PPARA"]] <- names(temp)[temp %in% c(1, 4)]
+
+anno.col <- data.frame(
+    row.names = rownames(plot.data),
+    "con" = ifelse(rownames(plot.data) %in% peaks.common[["PPARA"]], "Consensus", "Specific")
+)
+
+pdf("Cluster_level/Heatmap.PPARA.clusterPeaks.pdf", 10, 6)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
+        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_col = anno.col,
+    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 15
+)
+dev.off()
+
+# Group1 TFs: SOX2, FOXA3
+# SOX2
+cluster.selected <- cluster.info %>%
+    filter(Epi_Group == "Group_1") %>%
+    rownames()
+
+peak.selected <- motif.match[, "SOX2"] %>%
+    .[.] %>%
+    names() %>%
+    intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
+length(peak.selected) # 6048 SOX2 peaks
+
+plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
+rownames(plot.data) <- peak.selected
+colnames(plot.data) <- cluster.selected
+for (one in cluster.selected) {
+    plot.data[peak.selected %in% peaks.clusters[[one]], one] <- 1
+}
+
+pdf("Cluster_level/Heatmap.SOX2.clusterPeaks.pdf", 10, 4.5)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
+        "C27", "C1"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_color = mycolor,
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 11
+)
+dev.off()
+
+temp <- cutree(p$tree_col, 11)
+rowSums(plot.data[names(temp), ]) %>%
+    aggregate(., by = list(temp), FUN = mean) # 1
+peaks.common[["SOX2"]] <- names(temp)[temp %in% c(1)]
+
+anno.col <- data.frame(
+    row.names = rownames(plot.data),
+    "con" = ifelse(rownames(plot.data) %in% peaks.common[["SOX2"]], "Consensus", "Specific")
+)
+
+pdf("Cluster_level/Heatmap.SOX2.clusterPeaks.pdf", 10, 4.5)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
+        "C27", "C1"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_col = anno.col,
+    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 11
+)
+dev.off()
+
+# FOXA3
+peak.selected <- motif.match[, "FOXA3"] %>%
+    .[.] %>%
+    names() %>%
+    intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
+length(peak.selected) # 18275 FOXA3 peaks
+
+plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
+rownames(plot.data) <- peak.selected
+colnames(plot.data) <- cluster.selected
+for (one in cluster.selected) {
+    plot.data[peak.selected %in% peaks.clusters[[one]], one] <- 1
+}
+
+pdf("Cluster_level/Heatmap.FOXA3.clusterPeaks.pdf", 10, 4.5)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
+        "C27", "C1"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_color = mycolor,
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 11
+)
+dev.off()
+
+temp <- cutree(p$tree_col, 11)
+rowSums(plot.data[names(temp), ]) %>%
+    aggregate(., by = list(temp), FUN = mean) # 8
+peaks.common[["FOXA3"]] <- names(temp)[temp %in% c(8)]
+
+anno.col <- data.frame(
+    row.names = rownames(plot.data),
+    "con" = ifelse(rownames(plot.data) %in% peaks.common[["FOXA3"]], "Consensus", "Specific")
+)
+
+pdf("Cluster_level/Heatmap.FOXA3.clusterPeaks.pdf", 10, 4.5)
+p <- pheatmap(
+    t(plot.data)[c(
+        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
+        "C27", "C1"
+    ), ],
+    scale = "none",
+    cluster_rows = FALSE,
+    cluster_cols = TRUE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    annotation_row = cluster.info %>% select(c("Epi_Group")),
+    annotation_col = anno.col,
+    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
+    color = colorRampPalette(c("gray80", "#cd2525"))(2),
+    clustering_method = "ward.D2",
+    cutree_cols = 11
+)
+dev.off()
+
+rm(p, peak.selected, cluster.selected, plot.data, one, temp, anno.col)
+
+## 7.3. identify iCMS-consensus TFs ----
+homer.res.cluster <- list()
+
+sapply(rownames(cluster.info), function(one) {
+    homer.res <- homer.parser(paste0("homer/Cluster/", one, "/knownResults.txt"))
+    homer.res$Cluster <- one
+    homer.res.cluster[[one]] <<- homer.res
+    return(1)
+})
+sapply(homer.res.cluster, dim)
+# sapply(homer.res.cluster, function(x) {
+#     return(x[x$TF == "PPARA", c("p.value", "Log2_Enrichment")])
+# })
+
+TF.sig.cluster <- sapply(homer.res.cluster, function(x) {
+    x <- x[x$Diff == "up", ]
+    return(x$TF)
+})
+
+cluster.selected <- cluster.info %>%
+    filter(iCMS == "iCMS2") %>%
+    rownames()
+plot.data <- table(unlist(TF.sig.cluster[cluster.selected])) %>%
+    as.data.frame() %>%
+    mutate(iCMS = "iCMS2")
+p1 <- ggplot(plot.data) +
+    geom_bar(aes(x = Freq, fill = iCMS),
+        stat = "count", show.legend = FALSE
+    ) +
+    facet_grid(cols = vars(iCMS), scales = "free", space = "free") +
+        scale_fill_manual(values = c("iCMS2" = "#283891", "iCMS3" = "#62b7e6")) +
+        theme_bw() +
+        geom_vline(xintercept = 11.5, linetype = 2) +
+        xlab("Number of clusters") + 
+        ylab("Number of TFs")
+consensus.TF <- list()
+consensus.TF$iCMS2 <- as.character(plot.data$Var1)[plot.data$Freq > 11.5]
+
+cluster.selected <- cluster.info %>%
+    filter(iCMS == "iCMS3") %>%
+    rownames()
+plot.data <- table(unlist(TF.sig.cluster[cluster.selected])) %>%
+    as.data.frame() %>%
+    mutate(iCMS = "iCMS3")
+p2 <- ggplot(plot.data) +
+    geom_bar(aes(x = Freq, fill = iCMS),
+        stat = "count", show.legend = FALSE
+    ) +
+    facet_grid(cols = vars(iCMS), scales = "free", space = "free") +
+    scale_fill_manual(values = c("iCMS2" = "#283891", "iCMS3" = "#62b7e6")) +
+    theme_bw() +
+    geom_vline(xintercept = 7.5, linetype = 2) +
+        xlab("Number of clusters") +
+        ylab("Number of TFs")
+
+consensus.TF$iCMS3 <- as.character(plot.data$Var1)[plot.data$Freq > 7.5]
+
+pdf("Cluster_level/Barplot.TF.iCMS.cluster.pdf", 7, 3)
+patchwork::wrap_plots(p1, p2, ncol = 2)
+dev.off()
+
+pdf("Cluster_level/Venn.consensus.TF.iCMS.pdf", 5, 4)
+plot(Vennerable::Venn(list(
+    "iCMS2" = consensus.TF$iCMS2,
+    "iCMS3" = consensus.TF$iCMS3
+)), doWeights = FALSE, show = list(Faces = FALSE))
+dev.off()
+setdiff(consensus.TF$iCMS2, consensus.TF$iCMS3) # "BORIS" "CDX2"  "HNF1"  "HNF4A" "LEF1"  "TCF7"  "TR4"
+setdiff(consensus.TF$iCMS3, consensus.TF$iCMS2) # "FOXA2" "NF1:FOXA1"
+intersect(consensus.TF$iCMS2, consensus.TF$iCMS3)
+
+rm(p, plot.data, p1, p2, cluster.selected, one, temp)
+
+## 7.4. target of consensus TFs ----
+consensus.TF.selected <-
+    sapply(consensus.TF, function(x) {
+        x[x %in% colnames(motif.match)]
+    })
+sapply(consensus.TF.selected, length)
+
+# iCMS2 consensu TFs
+cluster.selected <- cluster.info %>%
+    filter(iCMS == "iCMS2") %>%
+    rownames()
+cTF.peak.stat <- data.frame(
+    row.names = consensus.TF.selected$iCMS2,
+    TF = consensus.TF.selected$iCMS2,
+    "n_Peak" = 0,
+    "mean_n_cluster" = 0,
+    "n_cPeak" = 0,
+    "frac_cPeak" = 0,
+    "iCMS" = "iCMS2"
+)
+
+for(one in consensus.TF.selected$iCMS2){
+    peak.selected <- motif.match[, one] %>%
+        .[.] %>%
+        names() %>%
+        intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
+
+    cTF.peak.stat[one, "n_Peak"] <- length(peak.selected)
+    temp <- peaks.clusters[cluster.selected] %>%
+        unlist() %>%
+        .[. %in% peak.selected] %>%
+        table() %>%
+        sort(decreasing = TRUE)
+    cTF.peak.stat[one, "mean_n_cluster"] <- mean(temp)
+    cTF.peak.stat[one, "n_cPeak"] <- sum(temp > length(cluster.selected) * 0.4)
+    cTF.peak.stat[one, "frac_cPeak"] <- cTF.peak.stat[one, "n_cPeak"] / length(peak.selected)
+}
+cTF.peak.stat.iCM2 <- cTF.peak.stat
+
+# iCMS3 consensu TFs
+cluster.selected <- cluster.info %>%
+    filter(iCMS == "iCMS3") %>%
+    rownames()
+cTF.peak.stat <- data.frame(
+    row.names = consensus.TF.selected$iCMS3,
+    TF = consensus.TF.selected$iCMS3,
+    "n_Peak" = 0,
+    "mean_n_cluster" = 0,
+    "n_cPeak" = 0,
+    "frac_cPeak" = 0,
+    "iCMS" = "iCMS3"
+)
+
+for(one in consensus.TF.selected$iCMS3){
+    peak.selected <- motif.match[, one] %>%
+        .[.] %>%
+        names() %>%
+        intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
+
+    cTF.peak.stat[one, "n_Peak"] <- length(peak.selected)
+    temp <- peaks.clusters[cluster.selected] %>%
+        unlist() %>%
+        .[. %in% peak.selected] %>%
+        table() %>%
+        sort(decreasing = TRUE)
+    cTF.peak.stat[one, "mean_n_cluster"] <- mean(temp)
+    cTF.peak.stat[one, "n_cPeak"] <- sum(temp > length(cluster.selected) * 0.4)
+    cTF.peak.stat[one, "frac_cPeak"] <- cTF.peak.stat[one, "n_cPeak"] / length(peak.selected)
+}
+cTF.peak.stat.iCM3 <- cTF.peak.stat
+cTF.peak.stat <- rbind(cTF.peak.stat.iCM2, cTF.peak.stat.iCM3)
+saveRDS(cTF.peak.stat, "cTF.peak.stat.rds")
+
+pdf("Cluster_level/Scatter.frac_cTF.pdf", 9, 4)
+ggplot(cTF.peak.stat, aes(x = n_Peak, y = frac_cPeak)) +
+    geom_point(aes(color = mean_n_cluster), size = 2.5) +
+    ggrepel::geom_text_repel(aes(label = TF)) +
+    facet_grid(cols = vars(iCMS), scales = "free") +
+    xlab("Number of gained targeting peaks") +
+    ylab("Fraction of consensus targeting peaks") +
+    scale_color_viridis_c() +
+    theme_bw()
 dev.off()
 
 gc()
