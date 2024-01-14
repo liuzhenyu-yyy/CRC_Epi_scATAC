@@ -1730,7 +1730,7 @@ rm(p, peak.selected, cluster.selected, plot.data, one, temp, anno.col)
 homer.res.cluster <- list()
 
 sapply(rownames(cluster.info), function(one) {
-    homer.res <- homer.parser(paste0("homer/Cluster/", one, "/knownResults.txt"))
+    homer.res <- homer.parser(paste0("homer/Cluster/", one, "/knownResults.txt"), log2.enrichment = 0.8)
     homer.res$Cluster <- one
     homer.res.cluster[[one]] <<- homer.res
     return(1)
@@ -1793,8 +1793,10 @@ plot(Vennerable::Venn(list(
     "iCMS3" = consensus.TF$iCMS3
 )), doWeights = FALSE, show = list(Faces = FALSE))
 dev.off()
-setdiff(consensus.TF$iCMS2, consensus.TF$iCMS3) # "BORIS" "CDX2"  "HNF1"  "HNF4A" "LEF1"  "TCF7"  "TR4"
-setdiff(consensus.TF$iCMS3, consensus.TF$iCMS2) # "FOXA2" "NF1:FOXA1"
+setdiff(consensus.TF$iCMS2, consensus.TF$iCMS3)
+# "BORIS" "CDX2" "CDX4" "HNF1" "HNF1B" "HNF4A" "HOXB13" "JUND" "LEF1" "NUR77" "SP1" "TR4"
+setdiff(consensus.TF$iCMS3, consensus.TF$iCMS2)
+# "EKLF" "ELF3" "ELF5" "ETS1-DISTAL" "FOX:EBOX" "FOXA1" "FOXM1""GRHL2" "KLF3" "MAFB" "NF1:FOXA1"
 intersect(consensus.TF$iCMS2, consensus.TF$iCMS3)
 
 rm(p, plot.data, p1, p2, cluster.selected, one, temp)
@@ -1819,8 +1821,7 @@ cTF.peak.stat <- data.frame(
     "frac_cPeak" = 0,
     "iCMS" = "iCMS2"
 )
-
-for(one in consensus.TF.selected$iCMS2){
+for (one in consensus.TF.selected$iCMS2) {
     peak.selected <- motif.match[, one] %>%
         .[.] %>%
         names() %>%
@@ -1852,7 +1853,7 @@ cTF.peak.stat <- data.frame(
     "iCMS" = "iCMS3"
 )
 
-for(one in consensus.TF.selected$iCMS3){
+for (one in consensus.TF.selected$iCMS3){
     peak.selected <- motif.match[, one] %>%
         .[.] %>%
         names() %>%
@@ -1875,7 +1876,7 @@ saveRDS(cTF.peak.stat, "cTF.peak.stat.rds")
 pdf("Cluster_level/Scatter.frac_cTF.pdf", 9, 4)
 ggplot(cTF.peak.stat, aes(x = n_Peak, y = frac_cPeak)) +
     geom_point(aes(color = mean_n_cluster), size = 2.5) +
-    ggrepel::geom_text_repel(aes(label = TF)) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 3) +
     facet_grid(cols = vars(iCMS), scales = "free") +
     xlab("Number of gained targeting peaks") +
     ylab("Fraction of consensus targeting peaks") +
