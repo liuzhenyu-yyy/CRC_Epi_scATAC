@@ -201,6 +201,7 @@ cnaobj@assays@data$CNA[1:5, 1:5]
 
 CNV.FC <- as.data.frame(cnaobj@assays@data$log2FC)
 sw <- cnaobj@rowRanges # 1190
+saveRDS(sw, "sw.rds")
 sw.filtered <- sw[sw$percentEffectiveLength > 90] # 1067
 length(sw.filtered)
 
