@@ -299,7 +299,7 @@ anno.col <- cluster.info %>% select(c("Epi_type", "Epi_Group"))
 plot.data <- peakmat.cluster[diff_peaks$AD_vs_NA$Up$peak_id, ]
 plot.data <- plot.data[, order(cluster.info$Epi_Group)]
 
-pdf("Heatmap.AD_vs_NA.Up.pdf", 6, 6)
+pdf("Heatmap.AD_vs_NA.cluster.Up.pdf", 6, 6)
 pheatmap(plot.data,
     scale = "row",
     show_rownames = FALSE,
@@ -313,7 +313,7 @@ dev.off()
 plot.data <- peakmat.cluster[diff_peaks$AD_vs_NA$Down$peak_id, ]
 plot.data <- plot.data[, order(cluster.info$Epi_Group)]
 
-pdf("Heatmap.AD_vs_NA.Down.pdf", 6, 6)
+pdf("Heatmap.AD_vs_NA.cluster.Down.pdf", 6, 6)
 pheatmap(plot.data,
     scale = "row",
     show_rownames = FALSE,
@@ -323,6 +323,72 @@ pheatmap(plot.data,
     annotation_colors = mycolor
 )
 dev.off()
+rm(plot.data, anno.col)
+
+# patient level
+proj_Epi$Sample_Type <- paste(proj_Epi$Sample, proj_Epi$Epi_type, sep = "_")
+
+sePeaks <- readRDS("../01.All_scCNV/sePeaks.Sample_Type.rds")
+
+selected <- table(proj_Epi$Sample_Type)
+selected <- names(selected)[selected > 10]
+selected <- setdiff(selected, "COAD09_Adenoma")
+
+rownames(sePeaks) <- paste(rowData(sePeaks)$seqnames,
+    rowData(sePeaks)$start,
+    rowData(sePeaks)$end,
+    sep = "_"
+)
+rownames(sePeaks@assays@data$PeakMatrix) <- rownames(sePeaks)
+
+peakmat.patient <- sePeaks@assays@data$PeakMatrix
+peakmat.patient <- peakmat.patient[c(diff_peaks$AD_vs_NA$Up$peak_id, diff_peaks$AD_vs_NA$Down$peak_id), ]
+peakmat.patient <- peakmat.patient[!duplicated(rownames(peakmat.patient)), selected]
+rm(sePeaks)
+
+plot.data <- apply(peakmat.patient, 1, function(x) {
+    x <- (x - mean(x)) / sd(x)
+    return(x)
+}) %>% t()
+plot.data[plot.data > 1.5] <- 1.5
+plot.data[plot.data < (-1.5)] <- -1.5
+
+anno.col <- data.frame(
+    row.names = colnames(plot.data),
+    Epi_type = gsub("^.+?_", "", colnames(plot.data)) %>%
+        factor(levels = c("Normal", "Adenoma", "Malignant")),
+    temp = "none"
+)
+anno.col <- anno.col[order(anno.col$Epi_type, rnorm(nrow(anno.col))), ]
+
+anno.row <- data.frame(
+    row.names = rownames(plot.data),
+    peak = ifelse(rownames(plot.data) %in% diff_peaks$AD_vs_NA$Up$peak_id, "Up", "Down"),
+    change = "none"
+)
+anno.row$change <- log2(rowMeans(peakmat.patient[, grep("Malignant", colnames(peakmat.patient))]) /
+    rowMeans(peakmat.patient[, grep("Normal", colnames(peakmat.patient))]))
+anno.row$status <- "none"
+anno.row$status[anno.row$change > 1] <- "Up"
+anno.row$status[anno.row$change < -1] <- "Down"
+table(anno.row$status)
+anno.row$status <- ifelse(anno.row$status == anno.row$peak, "Keep", "Revert")
+
+anno.row <- anno.row[order(anno.row$peak, anno.row$status, rowSums(plot.data[, anno.col$Epi_type != "Malignant"])), ]
+plot.data <- plot.data[rownames(anno.row), rownames(anno.col)]
+
+png("Heatmap.AD_vs_NA.patient.png", 600, 600)
+pheatmap(plot.data,
+    scale = "none",
+    show_rownames = FALSE,
+    cluster_cols = FALSE,
+    cluster_rows = FALSE,
+    annotation_col = anno.col %>% select(Epi_type),
+    annotation_row = anno.row %>% select(peak, status),
+    annotation_colors = c(mycolor, list(status = c("Keep" = "#81c6a0", "Revert" = "#f0bd3b")))
+)
+dev.off()
+
 rm(plot.data, anno.col)
 
 ## 2.3. Line chart of aggregated peaks ----
@@ -379,6 +445,64 @@ ggplot(plot.data, aes(x = Epi_type, y = Mean)) +
     ylab("Mean ATAC signal")
 dev.off()
 rm(plot.data)
+
+## 2.4 percent of tumor peaks in adenoma ----
+cluster.info <- readRDS("../03.Epi_Molecular_Subtype/cluster.info.rds")
+
+peaks.clusters.up <- list()
+peaks.clusters.down <- list()
+sapply(rownames(cluster.info), function(one) {
+    temp <- read.table(paste0("../03.Epi_Molecular_Subtype/diff_peak_cluster/marker.peak.tumor.", one, ".tsv"),
+        header = TRUE
+    ) %>%
+        mutate(
+            id = paste(seqnames, start, end, sep = "_")
+        )
+    peaks.clusters.up[[one]] <<- temp$id
+    return(1)
+})
+peaks.clusters.down <- sapply(rownames(cluster.info), function(one) {
+    temp <- read.table(paste0("../03.Epi_Molecular_Subtype/diff_peak_cluster/down/marker.peak.tumor.", one, ".tsv"),
+        header = TRUE, sep = "\t", stringsAsFactors = FALSE
+    )
+    return(paste(temp$seqnames, temp$start, temp$end, sep = "_"))
+})
+
+plot.data <- data.frame(
+    row.names = rownames(cluster.info),
+    "Cluster" = rownames(cluster.info),
+    "n_Up" = sapply(peaks.clusters.up, length),
+    "n_Down" = sapply(peaks.clusters.down, length),
+    "n_Up_Adenoma" = sapply(peaks.clusters.up, function(x) {
+        return(sum(x %in% diff_peaks$AD_vs_NA$Up$peak_id))
+    }),
+    "n_Down_Adenoma" = sapply(peaks.clusters.up, function(x) {
+        return(sum(x %in% diff_peaks$AD_vs_NA$Down$peak_id))
+    })
+)
+plot.data$n_Up_Malignant <- plot.data$n_Up - plot.data$n_Up_Adenoma
+plot.data$n_Down_Malignant <- plot.data$n_Down - plot.data$n_Down_Adenoma
+plot.data$n_Up <- NULL
+plot.data$n_Down <- NULL
+plot.data <- reshape2::melt(plot.data, id.vars = "Cluster")
+plot.data$value[grep("Down", plot.data$variable)] <- plot.data$value[grep("Down", plot.data$variable)] * -1
+plot.data$variable <- factor(plot.data$variable,
+    levels = c("n_Up_Malignant", "n_Up_Adenoma", "n_Down_Malignant", "n_Down_Adenoma")
+)
+
+cluster.rename <- read.table("../01.All_scCNV/cluster_rename.txt", header = TRUE)
+rownames(cluster.rename) <- cluster.rename$Cluster
+plot.data$Cluster_rename <- cluster.rename[plot.data$Cluster, "manual"]
+
+pdf("Barplot.cluster.tumor.peak.in.adenoma.pdf", 6, 3)
+ggplot(plot.data, aes(x = Cluster_rename, y = value / 1000, fill = variable)) +
+    geom_bar(stat = "identity", position = "stack") +
+    theme_classic() +
+    scale_fill_manual(values = c("#cd2525", "#f89797", "#1774cd", "#75b6f4")) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    ylab("Number of peaks (10^3)") +
+    xlab("Cluster_rename")
+dev.off()
 
 # 3. correlation of diff peak and methylation ----
 load("Methylation_data/methylation.rda")
