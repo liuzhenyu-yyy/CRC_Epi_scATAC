@@ -663,49 +663,7 @@ rm(net.sub, one)
 # 5. TF enrichment in each patient ----
 dir.create("TF_motif_cluster")
 
-## 5.1 identify diff peaks in each cluster & run Homers ----
-table(proj_Epi$Clusters)
-dir.create("diff_peak_cluster")
-dir.create("diff_peak_cluster/bed")
-
-for (one in rownames(cluster.info)) {
-    marker.peak.one <- getMarkerFeatures(
-        ArchRProj = proj_Epi,
-        useMatrix = "PeakMatrix",
-        groupBy = "Clusters",
-        testMethod = "wilcoxon",
-        bias = c("TSSEnrichment", "log10(nFrags)"),
-        useGroups = one,
-        bgdGroups = c("C3", "C4")
-    )
-
-    marker.peak.one.df <- getMarkers(marker.peak.one,
-        cutOff = "FDR <= 0.01 & Log2FC >= 1"
-    )[[1]] %>% as.data.frame()
-    write.table(
-        marker.peak.one.df,
-        paste0("diff_peak_cluster/marker.peak.tumor.", one, ".tsv"),
-        col.names = TRUE,
-        sep = "\t", quote = FALSE, row.names = FALSE
-    )
-
-    marker.peak.one.df <- marker.peak.one.df  %>%
-        select(seqnames, start, end) %>%
-        mutate(
-            id = paste(seqnames, start, end, sep = "_"),
-            length = 500,
-            strand = "."
-        )
-    write.table(
-        marker.peak.one.df,
-        paste0("diff_peak_cluster/bed/marker.peak.tumor.", one, ".bed"),
-        col.names = FALSE,
-        sep = "\t", quote = FALSE, row.names = FALSE
-    )
-}
-rm(one, marker.peak.one.df, marker.peak.one, test)
-
-# statistcs of diff peaks by patient
+## 5.1 load diff peak/TF in each cluster ----
 peaks.clusters <- sapply(rownames(cluster.info), function(one) {
     temp <- read.table(paste0("diff_peak_cluster/marker.peak.tumor.", one, ".tsv"),
         header = TRUE, sep = "\t", stringsAsFactors = FALSE
@@ -714,11 +672,6 @@ peaks.clusters <- sapply(rownames(cluster.info), function(one) {
 })
 sapply(peaks.clusters, length)
 temp <- peaks.clusters  %>%  unlist() %>% table() %>% sort(decreasing = TRUE)
-
-length(unique(unname(unlist(peaks.clusters)))) # 159823
-sum(temp > 2) # 56587
-sum(temp > 5) # 22463
-sum(temp > 12) # 3997
 
 # find motifs in each patient
 # sh Run.Homoer.Motif.sh
@@ -877,746 +830,98 @@ ggplot(plot.data) +
 dev.off()
 rm(plot.data, gene.selected, p)
 
-# 6. inter-patient heterogeneity by patient-specific peaks ----
-## 6.1. get data: diff peak & motif match ----
-# significant peaks of each clusters
-peaks.clusters <- list()
-sapply(rownames(cluster.info), function(one) {
-    temp <- read.table(paste0("diff_peak_cluster/marker.peak.tumor.", one, ".tsv"), header = TRUE) %>%
-        mutate(
-            id = paste(seqnames, start, end, sep = "_")
-        )
-    peaks.clusters[[one]] <<- temp$id
-    return(1)
-})
-sapply(peaks.clusters, length)
+# 6. TF activity and gene module ----
+dir.create("TF_gene_module")
 
-# motif match matrix
-motif.match <- getMatches(ArchRProj = proj_Epi, name = "Motif")
-temp <- rowRanges(motif.match)
-motif.match <- motif.match@assays@data$matches
+## 6.1. get cluster module score ----
+cluster.info$iCMS <- ifelse(cluster.info$Epi_Group == "Group_1", "iCMS3", "iCMS2")
 
-rownames(motif.match) <- paste(seqnames(temp), start(temp), end(temp), sep = "_")
-colnames(motif.match) <- gsub("_.+?$", "", colnames(motif.match))
-motif.match[1:5, 1:5]
-rm(temp)
+sePeaks <- readRDS("../03.Epi_Molecular_Subtype/sePeaks.cluster.rds")
+Module.Mat.cluster <- sePeaks@colData %>%
+    as.data.frame() %>%
+    select(starts_with("Module.")) %>%
+    .[rownames(cluster.info), c(1,2,6,3,4,5)]
+identical(rownames(Module.Mat.cluster), rownames(cluster.info))
 
-## 6.2. plot diff peak with motif in each cluster ----
-peaks.common <- list()
-sapply(peaks.common, length)
-# Group2 TFs: HNF4A, PPARA
-cluster.selected <- cluster.info %>%
-    filter(Epi_Group == "Group_2") %>%
-    rownames()
+cluster.info <- cbind(cluster.info, Module.Mat.cluster)
+rm(sePeaks)
 
-# HNF4A
-peak.selected <- motif.match[, "HNF4A"] %>%
-    .[.] %>%
-    names() %>%
-    intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
-length(peak.selected) # 20059 HNF4A peaks
+## 6.2 link TF module to iCMS module ----
+identical(rownames(MEs), rownames(Module.Mat.cluster))
 
-plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
-rownames(plot.data) <- peak.selected
-colnames(plot.data) <- cluster.selected
-for (one in cluster.selected) {
-    plot.data[peak.selected %in% peaks.clusters[[one]], one] <- 1
+cor.TF.iCMS <- cor(MEs, Module.Mat.cluster, use = "p")
+p.TF.iCMS <- corPvalueStudent(cor.TF.iCMS, nrow(MotifMat.cluster))
+cor.TF.iCMS <- t(cor.TF.iCMS) %>% as.data.frame()
+p.TF.iCMS <- t(p.TF.iCMS) %>% as.data.frame()
+
+orders <- gsub("ME", "", colnames(cor.TF.iCMS)) %>%
+    as.numeric() %>%
+    order() %>%
+    .[2:length(.)]
+
+pdf("TF_gene_module/Heatmap.cor.TF_iCMS.all.pdf", 7, 4)
+corrplot(
+    (as.matrix(cor.TF.iCMS[, orders])),
+    method = "color",
+    # addCoef.col = "black",
+    tl.col = "black",
+    tl.cex = 1,
+    p.mat = as.matrix(p.TF.iCMS[, orders]),
+    sig.level = c(0.001, 0.01, 0.05),
+    pch.cex = 1.3,
+    insig = "label_sig",
+    col = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100)
+)
+dev.off()
+
+orders <- paste("ME", c(5, 6, 8, 9), sep = "")
+pdf("TF_gene_module/Heatmap.cor.TF_iCMS.pdf", 4, 4)
+corrplot(
+    as.matrix(cor.TF.iCMS[, orders]),
+    method = "color",
+    # addCoef.col = "black",
+    tl.col = "black",
+    tl.cex = 1,
+    p.mat = as.matrix(p.TF.iCMS[, orders]),
+    sig.level = c(0.001, 0.01, 0.05),
+    pch.cex = 1.3,
+    insig = "label_sig",
+    col = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100)
+)
+dev.off()
+
+## 6.3 visulization of correlation ----
+plot.data <- cbind(
+    Module.Mat.cluster[, c(1, 2, 4, 5)],
+    MEs[c("ME5", "ME6", "ME8")],
+    cluster.info %>% select(c("iCMS"))
+) %>%
+    mutate("Clusters" = rownames(.))
+
+ME_select <- c("ME5", "ME6", "ME8", "ME5", "ME6", "ME8")
+Module_select <- c(
+    "Module.iCMS2_Down", "Module.iCMS2_Down", "Module.iCMS2_Up",
+    "Module.iCMS3_Up", "Module.iCMS3_Up", "Module.iCMS3_Down"
+)
+
+p.list <- list()
+
+for (i in 1:6) {
+    plot.data$TF_module <- plot.data[, ME_select[i]]
+    plot.data$Gene_Module <- plot.data[, Module_select[i]]
+    p <- ggplot(plot.data, aes(x = TF_module, y = Gene_Module)) +
+        geom_point(aes(color = iCMS), show.legend = FALSE) +
+        theme_classic() +
+        ggpubr::stat_cor() +
+        geom_smooth(method = "lm", formula = y ~ x, fill = "gray75") +
+        xlab(ME_select[i]) +
+        ylab(Module_select[i]) +
+        scale_color_manual(values = c("iCMS2" = "#283891", "iCMS3" = "#62b7e6"))
+    p.list[[i]] <- p
 }
 
-pdf("TF_motif_cluster/Heatmap.HNF4A.clusterPeaks1.pdf", 10, 6)
-p <- pheatmap(
-    t(plot.data)[c(
-        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
-        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
-    ), ],
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_row = cluster.info %>% select(c("Epi_Group")),
-    annotation_color = mycolor,
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 17
-)
-dev.off()
-
-temp <- cutree(p$tree_col, 17)
-rowSums(plot.data[names(temp), ]) %>%
-    aggregate(., by = list(temp), FUN = mean) # 4 and 15
-peaks.common[["HNF4A"]] <- names(temp)[temp %in% c(4, 15)]
-
-anno.col <- data.frame(
-    row.names = rownames(plot.data),
-    "con" = ifelse(rownames(plot.data) %in% peaks.common[["HNF4A"]], "Consensus", "Specific")
-)
-
-pdf("TF_motif_cluster/Heatmap.HNF4A.clusterPeaks.pdf", 10, 6)
-p <- pheatmap(
-    t(plot.data)[c(
-        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
-        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
-    ), ],
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_row = cluster.info %>% select(c("Epi_Group")),
-    annotation_col = anno.col,
-    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 17
-)
-dev.off()
-
-# PPARA
-peak.selected <- motif.match[, "PPARA"] %>%
-    .[.] %>%
-    names() %>%
-    intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
-length(peak.selected) # 9720 HNF4A peaks
-
-plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
-rownames(plot.data) <- peak.selected
-colnames(plot.data) <- cluster.selected
-for (one in cluster.selected) {
-    plot.data[peak.selected %in% peaks.clusters[[one]], one] <- 1
-}
-
-pdf("TF_motif_cluster/Heatmap.PPARA.clusterPeaks.pdf", 10, 6)
-p <- pheatmap(
-    t(plot.data)[c(
-        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
-        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
-    ), ],
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_row = cluster.info %>% select(c("Epi_Group")),
-    annotation_color = mycolor,
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 15
-)
-dev.off()
-
-temp <- cutree(p$tree_col, 15)
-rowSums(plot.data[names(temp), ]) %>%
-    aggregate(., by = list(temp), FUN = mean) # 1 and 4
-peaks.common[["PPARA"]] <- names(temp)[temp %in% c(1, 4)]
-
-anno.col <- data.frame(
-    row.names = rownames(plot.data),
-    "con" = ifelse(rownames(plot.data) %in% peaks.common[["PPARA"]], "Consensus", "Specific")
-)
-
-pdf("TF_motif_cluster/Heatmap.PPARA.clusterPeaks.pdf", 10, 6)
-p <- pheatmap(
-    t(plot.data)[c(
-        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
-        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
-    ), ],
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_row = cluster.info %>% select(c("Epi_Group")),
-    annotation_col = anno.col,
-    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 15
-)
-dev.off()
-
-# Group1 TFs: SOX2, FOXA3
-# SOX2
-cluster.selected <- cluster.info %>%
-    filter(Epi_Group == "Group_1") %>%
-    rownames()
-
-peak.selected <- motif.match[, "SOX2"] %>%
-    .[.] %>%
-    names() %>%
-    intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
-length(peak.selected) # 6048 SOX2 peaks
-
-plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
-rownames(plot.data) <- peak.selected
-colnames(plot.data) <- cluster.selected
-for (one in cluster.selected) {
-    plot.data[peak.selected %in% peaks.clusters[[one]], one] <- 1
-}
-
-pdf("TF_motif_cluster/Heatmap.SOX2.clusterPeaks.pdf", 10, 4.5)
-p <- pheatmap(
-    t(plot.data)[c(
-        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
-        "C27", "C1"
-    ), ],
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_row = cluster.info %>% select(c("Epi_Group")),
-    annotation_color = mycolor,
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 11
-)
-dev.off()
-
-temp <- cutree(p$tree_col, 11)
-rowSums(plot.data[names(temp), ]) %>%
-    aggregate(., by = list(temp), FUN = mean) # 1
-peaks.common[["SOX2"]] <- names(temp)[temp %in% c(1)]
-
-anno.col <- data.frame(
-    row.names = rownames(plot.data),
-    "con" = ifelse(rownames(plot.data) %in% peaks.common[["SOX2"]], "Consensus", "Specific")
-)
-
-pdf("TF_motif_cluster/Heatmap.SOX2.clusterPeaks.pdf", 10, 4.5)
-p <- pheatmap(
-    t(plot.data)[c(
-        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
-        "C27", "C1"
-    ), ],
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_row = cluster.info %>% select(c("Epi_Group")),
-    annotation_col = anno.col,
-    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 11
-)
-dev.off()
-
-# FOXA3
-peak.selected <- motif.match[, "FOXA3"] %>%
-    .[.] %>%
-    names() %>%
-    intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
-length(peak.selected) # 18275 FOXA3 peaks
-
-plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
-rownames(plot.data) <- peak.selected
-colnames(plot.data) <- cluster.selected
-for (one in cluster.selected) {
-    plot.data[peak.selected %in% peaks.clusters[[one]], one] <- 1
-}
-
-pdf("TF_motif_cluster/Heatmap.FOXA3.clusterPeaks.pdf", 10, 4.5)
-p <- pheatmap(
-    t(plot.data)[c(
-        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
-        "C27", "C1"
-    ), ],
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_row = cluster.info %>% select(c("Epi_Group")),
-    annotation_color = mycolor,
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 11
-)
-dev.off()
-
-temp <- cutree(p$tree_col, 11)
-rowSums(plot.data[names(temp), ]) %>%
-    aggregate(., by = list(temp), FUN = mean) # 8
-peaks.common[["FOXA3"]] <- names(temp)[temp %in% c(8)]
-
-anno.col <- data.frame(
-    row.names = rownames(plot.data),
-    "con" = ifelse(rownames(plot.data) %in% peaks.common[["FOXA3"]], "Consensus", "Specific")
-)
-
-pdf("TF_motif_cluster/Heatmap.FOXA3.clusterPeaks.pdf", 10, 4.5)
-p <- pheatmap(
-    t(plot.data)[c(
-        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
-        "C27", "C1"
-    ), ],
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_row = cluster.info %>% select(c("Epi_Group")),
-    annotation_col = anno.col,
-    annotation_color = c(mycolor, list(con = c("Consensus" = "#86d786", "Specific" = "#f6be43"))),
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 11
-)
-dev.off()
-
-rm(p, peak.selected, cluster.selected, plot.data, one, temp, anno.col)
-
-## 6.3. co-binding of TFs ----
-pdf("TF_motif_cluster/Upset.Consensus.Peaks.pdf", 7, 4.5)
-upset(
-    fromList(
-        peaks.common
-    ),
-    nset = 4,
-    order.by = "freq"
-)
-dev.off()
-
-for (one in c("Group_1", "Group_2")) {
-    cluster.selected <- cluster.info %>%
-        filter(Epi_Group == one) %>%
-        rownames()
-
-    for (genes in list(c("HNF4A", "PPARA"), c("SOX2", "FOXA3"))) {
-        peak.selected1 <- motif.match[, genes[1]] %>%
-            .[.] %>%
-            names() %>%
-            intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
-        peak.selected2 <- motif.match[, genes[2]] %>%
-            .[.] %>%
-            names() %>%
-            intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
-        temp <- list(gene1 = peak.selected1, genes2 = peak.selected2)
-        names(temp) <- c(genes[1], genes[2])
-        v <- Venn(temp)
-
-        pdf(paste("TF_motif_cluster/Venn.", one, "_", genes[1], "_", genes[2], ".pdf", sep = ""), 5, 4)
-        gridExtra::grid.arrange(grid::grid.grabExpr(plot(v,
-            doWeights = TRUE,
-            show = list(Faces = FALSE)
-        )), top = paste(genes[1], genes[2], one, sep = " "))
-        dev.off()
-    }
-}
-rm(one, genes, cluster.selected, peak.selected1, peak.selected2, temp, v, motif.match)
-
-## 6.4. consensus peak genes ----
-# get consensus peaks to genes
-sapply(peaks.common, length)
-peakset <- proj_Epi@peakSet
-names(peakset) <- paste(seqnames(peakset), start(peakset), end(peakset), sep = "_")
-table(peakset$peakType)
-
-peaks.common.2gene <- sapply(peaks.common, function(one) {
-    temp <- peakset[one]
-    temp <- temp[temp$peakType != "Distal"]
-    temp <- unique(temp$nearestGene)
-    temp <- temp[!is.na(temp)]
-    return(temp)
-})
-sapply(peaks.common.2gene, length)
-
-length(unlist(peaks.common.2gene) %>% unique()) # 1582 geness
-rm(peakset)
-saveRDS(peaks.common.2gene, "peaks.common.2gene.rds")
-
-# overlap with iCMS markers
-markers.iCMS <- read.table("E:/LabWork/Project/CRC_NGS_ATAC/iCMS markers.txt",
-    stringsAsFactors = FALSE,
-    sep = "\t", header = TRUE
-)
-markers.iCMS <- base::as.list(markers.iCMS)
-genes <- getFeatures(proj_Epi, useMatrix = "GeneScoreMatrix")
-markers.iCMS <- lapply(markers.iCMS, function(x) intersect(x, genes))
-lapply(markers.iCMS, length)
-
-for (TF in names(peaks.common.2gene)) {
-    pdf(paste0("TF_motif_cluster/Venn.peaks.common.", TF, ".iCMS.pdf"), 5, 4)
-    for (genes in names(markers.iCMS)) {
-        temp <- list(target = peaks.common.2gene[[TF]], iCMS = markers.iCMS[[genes]])
-        names(temp) <- c(TF, genes)
-        v <- Vennerable::Venn(temp)
-        plot(v, doWeights = TRUE, show = list(Faces = FALSE))
-    }
-    dev.off()
-}
-rm(TF, genes, temp, v, markers.iCMS)
-
-# get cell by concensus gene matrix
-cGSMat <- getMatrixFromProject(
-    ArchRProj = proj_Epi,
-    useMatrix = "GeneScoreMatrix",
-    binarize = FALSE
-)
-dim(cGSMat)
-rownames(cGSMat@assays@data$GeneScoreMatrix) <- rowData(cGSMat)$name
-cGSMat <- cGSMat@assays@data$GeneScoreMatrix
-cGSMat <- as.data.frame(cGSMat)
-cGSMat <- cGSMat[unlist(peaks.common.2gene) %>% unique(), ]
-
-# reduction on consensus peak-genes
-pca.cGSMat <- prcomp(t(cGSMat)[rownames(sample.info.tumor), ],
-    center = TRUE, scale. = TRUE
-)
-
-pdf("TF_motif_cluster/Elbow.pca.cGSMat.pdf", 5, 5)
-plot(pca.cGSMat$sdev[1:50]^2)
-dev.off()
-
-sample.info.tumor$PCA_cGS_1 <- pca.cGSMat$x[rownames(sample.info.tumor), 1]
-sample.info.tumor$PCA_cGS_2 <- pca.cGSMat$x[rownames(sample.info.tumor), 2]
-sample.info.tumor$PCA_cGS_3 <- pca.cGSMat$x[rownames(sample.info.tumor), 3]
-
-pdf("TF_motif_cluster/PCA_cGSMat.Epi_Group.pdf", 12, 3.5)
-ggplot(sample.info.tumor, aes(x = PCA_cGS_1, y = PCA_cGS_2)) +
-    geom_point(aes(color = Epi_Group), size = 0.2) +
-    scale_color_manual(values = mycolor$Epi_Group) +
-    theme_classic() +
-    NoLegend() +
-    ggplot(sample.info.tumor, aes(x = PCA_cGS_1, y = PCA_cGS_3)) +
-    geom_point(aes(color = Epi_Group), size = 0.2) +
-    scale_color_manual(values = mycolor$Epi_Group) +
-    theme_classic() +
-    NoLegend() +
-    ggplot(sample.info.tumor, aes(x = PCA_cGS_2, y = PCA_cGS_3)) +
-    geom_point(aes(color = Epi_Group), size = 0.2) +
-    scale_color_manual(values = mycolor$Epi_Group) +
-    theme_classic()
-dev.off()
-pdf("TF_motif_cluster/PCA_cGS.CIMP_Group.pdf", 12, 3.5)
-ggplot(sample.info.tumor, aes(x = PCA_cGS_1, y = PCA_cGS_2)) +
-    geom_point(aes(color = CIMP_Group), size = 0.2) +
-    scale_color_manual(values = mycolor$CIMP_Group) +
-    theme_classic() +
-    NoLegend() +
-    ggplot(sample.info.tumor, aes(x = PCA_cGS_1, y = PCA_cGS_3)) +
-    geom_point(aes(color = CIMP_Group), size = 0.2) +
-    scale_color_manual(values = mycolor$CIMP_Group) +
-    theme_classic() +
-    NoLegend() +
-    ggplot(sample.info.tumor, aes(x = PCA_cGS_2, y = PCA_cGS_3)) +
-    geom_point(aes(color = CIMP_Group), size = 0.2) +
-    scale_color_manual(values = mycolor$CIMP_Group) +
-    theme_classic()
-dev.off()
-
-umap.cGSMat <- uwot::umap(pca.cGSMat$x[, 1:15],
-    n_neighbors = 30,
-    metric = "cosine",
-    min_dist = 1
-)
-sample.info.tumor$UMAP_cGS_1 <- umap.cGSMat[rownames(sample.info.tumor), 1]
-sample.info.tumor$UMAP_cGS_2 <- umap.cGSMat[rownames(sample.info.tumor), 2]
-
-pdf("TF_motif_cluster/UMAP_cGS.Epi_Group.pdf", 4.5, 4)
-ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
-    geom_point(aes(color = Epi_Group), size = 0.2) +
-    scale_color_manual(values = mycolor$Epi_Group) +
-    theme_bw() +
-    theme(
-        axis.text = element_blank(), axis.ticks = element_blank(),
-        panel.grid.major = element_blank(), panel.grid.minor = element_blank()
-    ) +
-    coord_fixed()
-dev.off()
-pdf("TF_motif_cluster/UMAP_cGS.CIMP_Group.pdf", 5, 4)
-ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
-    geom_point(aes(color = CIMP_Group), size = 0.2) +
-    scale_color_manual(values = mycolor$CIMP_Group) +
-    theme_bw() +
-    theme(
-        axis.text = element_blank(), axis.ticks = element_blank(),
-        panel.grid.major = element_blank(), panel.grid.minor = element_blank()
-    ) +
-    coord_fixed()
-dev.off()
-pdf("TF_motif_cluster/UMAP_cGS.Sample.pdf", 7, 6)
-ggplot(sample.info.tumor, aes(x = UMAP_cGS_1, y = UMAP_cGS_2)) +
-    geom_point(aes(color = Sample), size = 0.2) +
-    scale_color_manual(values = paletteDiscrete(sample.info.tumor$Sample)) +
-    theme_bw() +
-    theme(
-        axis.text = element_blank(), axis.ticks = element_blank(),
-        panel.grid.major = element_blank(), panel.grid.minor = element_blank()
-    ) +
-    coord_fixed()
-dev.off()
-rm(cGSMat, pca.cGSMat, umap.cGSMat)
-
-# 7. TF target in adenema? paired sample ----
-## 7.1. get data: paired diff peak & motif match ----
-proj_Epi$Patient_Epi <- paste(proj_Epi$Patient, proj_Epi$Epi_Group, sep = "_")
-proj_Epi$Patient_Epi[grep("Normal", proj_Epi$Epi_Group)] <- "Normal"
-table(proj_Epi$Epi_Group[proj_Epi$Patient == "COAD24"])
-
-# only paired samples
-marker.paired.list <- list()
-for (patient in c("COAD16", "COAD18", "COAD24", "COAD34")) {
-    for (one in c("Group_2", "Adenoma")) {
-        if (patient == "COAD34" && one == "Group_2") {
-            one <- "Group_1"
-        }
-        marker.peak.one <- getMarkerFeatures(
-            ArchRProj = proj_Epi,
-            useMatrix = "PeakMatrix",
-            groupBy = "Patient_Epi",
-            testMethod = "wilcoxon",
-            bias = c("TSSEnrichment", "log10(nFrags)"),
-            useGroups = paste(patient, one, sep = "_"),
-            bgdGroups = c("Normal")
-        )
-
-        marker.peak.one.df <- getMarkers(marker.peak.one,
-            cutOff = "FDR <= 0.01 & Log2FC >= 1"
-        )[[1]] %>% as.data.frame()
-
-        marker.paired.list[[paste(patient, one, sep = "_")]] <-
-            paste(marker.peak.one.df$seqnames,
-                marker.peak.one.df$start,
-                marker.peak.one.df$end,
-                sep = "_"
-            )
-    }
-}
-saveRDS(marker.paired.list, "marker.paired.list.RDS")
-marker.paired.list <- readRDS("marker.paired.list.RDS")
-sapply(marker.paired.list, length)
-
-# motif match matrix
-motif.match <- getMatches(ArchRProj = proj_Epi, name = "Motif")
-temp <- rowRanges(motif.match)
-motif.match <- motif.match@assays@data$matches
-
-rownames(motif.match) <- paste(seqnames(temp), start(temp), end(temp), sep = "_")
-colnames(motif.match) <- gsub("_.+?$", "", colnames(motif.match))
-motif.match[1:5, 1:5]
-rm(temp)
-
-temp <- peak.selected <- motif.match[, "PPARA"] %>%
-    .[.] %>%
-    names()
-
-one <- intersect(marker.paired.list$COAD24_Adenoma, temp)
-sum(one %in% peaks.common[["PPARA"]]) / length(one)
-
-## 7.2. iCMS2 TFs ----
-cluster.selected <- cluster.info %>%
-    filter(Epi_Group == "Group_2") %>%
-    rownames()
-marker.paired.list.sub <- marker.paired.list[c(1:6)]
-
-# HNF4A
-peak.selected <- motif.match[, "HNF4A"] %>%
-    .[.] %>%
-    names() %>%
-    intersect(., c(
-        unlist(peaks.clusters[cluster.selected]),
-        unlist(marker.paired.list.sub)
-    ) %>% unique())
-length(peak.selected) # 20724 HNF4A peaks,AD + CRC
-
-plot.data1 <- matrix(0, ncol = length(peak.selected), nrow = length(marker.paired.list.sub))
-colnames(plot.data1) <- peak.selected
-rownames(plot.data1) <- names(marker.paired.list.sub)
-plot.data1 <- as.data.frame(plot.data1)
-
-for (patient in c("COAD16", "COAD18", "COAD24")) {
-    for (one in c("Group_2", "Adenoma")) {
-        temp <- paste(patient, one, sep = "_")
-        plot.data1[temp, colnames(plot.data1) %in% marker.paired.list.sub[[temp]]] <- 1
-    }
-}
-plot.data1 <- plot.data1[c(2, 4, 6, 1, 3, 5), ]
-
-plot.data2 <- matrix(0, ncol = length(peak.selected), nrow = length(cluster.selected))
-colnames(plot.data2) <- peak.selected
-rownames(plot.data2) <- cluster.selected
-plot.data2 <- as.data.frame(plot.data2)
-
-for (one in cluster.selected) {
-    plot.data2[one, peak.selected %in% peaks.clusters[[one]]] <- 1
-}
-
-rownames(plot.data2) <- paste(cluster.selected, cluster.info[cluster.selected, "Patient_Major"], sep = "_")
-plot.data <- rbind(plot.data1, plot.data2)
-
-pdf("TF_motif_cluster/Heatmap.Paired.HNF4A.PatientPeaks.pdf", 10, 6)
-pheatmap(
-    plot.data,
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_color = mycolor,
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 12
-)
-dev.off()
-
-# PPARA
-peak.selected <- motif.match[, "PPARA"] %>%
-    .[.] %>%
-    names() %>%
-    intersect(., c(
-        unlist(peaks.clusters[cluster.selected]),
-        unlist(marker.paired.list.sub)
-    ) %>% unique())
-length(peak.selected) # 10081 HNF4A peaks,AD + CRC
-
-plot.data1 <- matrix(0, ncol = length(peak.selected), nrow = length(marker.paired.list.sub))
-colnames(plot.data1) <- peak.selected
-rownames(plot.data1) <- names(marker.paired.list.sub)
-plot.data1 <- as.data.frame(plot.data1)
-
-for (patient in c("COAD16", "COAD18", "COAD24")) {
-    for (one in c("Group_2", "Adenoma")) {
-        temp <- paste(patient, one, sep = "_")
-        plot.data1[temp, colnames(plot.data1) %in% marker.paired.list.sub[[temp]]] <- 1
-    }
-}
-rowSums(plot.data1)
-plot.data1 <- plot.data1[c(2, 4, 6, 1, 3, 5), ]
-
-plot.data2 <- matrix(0, ncol = length(peak.selected), nrow = length(cluster.selected))
-colnames(plot.data2) <- peak.selected
-rownames(plot.data2) <- cluster.selected
-plot.data2 <- as.data.frame(plot.data2)
-
-for (one in cluster.selected) {
-    plot.data2[one, peak.selected %in% peaks.clusters[[one]]] <- 1
-}
-
-rownames(plot.data2) <- paste(cluster.selected, cluster.info[cluster.selected, "Patient_Major"], sep = "_")
-plot.data <- rbind(plot.data1, plot.data2)
-
-pdf("TF_motif_cluster/Heatmap.Paired.PPARA.PatientPeaks.pdf", 10, 6)
-pheatmap(
-    plot.data,
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_color = mycolor,
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 12
-)
-dev.off()
-
-## 7.3. iCMS3 TFs ----
-cluster.selected <- cluster.info %>%
-    filter(Epi_Group == "Group_1") %>%
-    rownames()
-marker.paired.list.sub <- marker.paired.list[c(7:8)]
-
-# SOX2
-peak.selected <- motif.match[, "SOX2"] %>%
-    .[.] %>%
-    names() %>%
-    intersect(., c(
-        unlist(peaks.clusters[cluster.selected]),
-        unlist(marker.paired.list.sub)
-    ) %>% unique())
-length(peak.selected) # 6175 SOX2 peaks,AD + CRC
-
-plot.data1 <- matrix(0, ncol = length(peak.selected), nrow = length(marker.paired.list.sub))
-colnames(plot.data1) <- peak.selected
-rownames(plot.data1) <- names(marker.paired.list.sub)
-plot.data1 <- as.data.frame(plot.data1)
-
-for (one in c("Group_1", "Adenoma")) {
-    temp <- paste("COAD34", one, sep = "_")
-    plot.data1[temp, colnames(plot.data1) %in% marker.paired.list.sub[[temp]]] <- 1
-}
-
-rowSums(plot.data1)
-plot.data1 <- plot.data1[c(2, 1), ]
-
-plot.data2 <- matrix(0, ncol = length(peak.selected), nrow = length(cluster.selected))
-colnames(plot.data2) <- peak.selected
-rownames(plot.data2) <- cluster.selected
-plot.data2 <- as.data.frame(plot.data2)
-
-for (one in cluster.selected) {
-    plot.data2[one, peak.selected %in% peaks.clusters[[one]]] <- 1
-}
-
-rownames(plot.data2) <- paste(cluster.selected, cluster.info[cluster.selected, "Patient_Major"], sep = "_")
-plot.data <- rbind(plot.data1, plot.data2)
-
-pdf("TF_motif_cluster/Heatmap.Paired.SOX2.PatientPeaks.pdf", 10, 5)
-pheatmap(
-    plot.data,
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_color = mycolor,
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 12
-)
-dev.off()
-
-# FOXA3
-peak.selected <- motif.match[, "FOXA3"] %>%
-    .[.] %>%
-    names() %>%
-    intersect(., c(
-        unlist(peaks.clusters[cluster.selected]),
-        unlist(marker.paired.list.sub)
-    ) %>% unique())
-length(peak.selected) # 18686 FOXA3 peaks,AD + CRC
-
-plot.data1 <- matrix(0, ncol = length(peak.selected), nrow = length(marker.paired.list.sub))
-colnames(plot.data1) <- peak.selected
-rownames(plot.data1) <- names(marker.paired.list.sub)
-plot.data1 <- as.data.frame(plot.data1)
-
-for (one in c("Group_1", "Adenoma")) {
-    temp <- paste("COAD34", one, sep = "_")
-    plot.data1[temp, colnames(plot.data1) %in% marker.paired.list.sub[[temp]]] <- 1
-}
-
-rowSums(plot.data1)
-plot.data1 <- plot.data1[c(2, 1), ]
-
-plot.data2 <- matrix(0, ncol = length(peak.selected), nrow = length(cluster.selected))
-colnames(plot.data2) <- peak.selected
-rownames(plot.data2) <- cluster.selected
-plot.data2 <- as.data.frame(plot.data2)
-
-for (one in cluster.selected) {
-    plot.data2[one, peak.selected %in% peaks.clusters[[one]]] <- 1
-}
-
-rownames(plot.data2) <- paste(cluster.selected, cluster.info[cluster.selected, "Patient_Major"], sep = "_")
-plot.data <- rbind(plot.data1, plot.data2)
-
-pdf("TF_motif_cluster/Heatmap.Paired.FOXA3.PatientPeaks.pdf", 10, 5)
-pheatmap(
-    plot.data,
-    scale = "none",
-    cluster_rows = FALSE,
-    cluster_cols = TRUE,
-    show_rownames = TRUE,
-    show_colnames = FALSE,
-    annotation_color = mycolor,
-    color = colorRampPalette(c("gray80", "#cd2525"))(2),
-    clustering_method = "ward.D2",
-    cutree_cols = 12
-)
+pdf("TF_gene_module/Scatter.TF_Module_iCMS.pdf", 8, 5)
+patchwork::wrap_plots(p.list, ncol = 3)
 dev.off()
 
 gc()
