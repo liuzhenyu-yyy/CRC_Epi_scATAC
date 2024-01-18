@@ -13,8 +13,8 @@ names(files) <- names
 ArrowFiles <- createArrowFiles(
     inputFiles = files,
     sampleNames = names,
-    minTSS = 0,
-    minFrags = 0,
+    minTSS = 4,
+    minFrags = 3000,
     maxFrags = 1e+09,
     addTileMat = TRUE,
     addGeneScoreMat = TRUE
