@@ -408,21 +408,29 @@ proj_Epi$Module.iCMS3 <- proj_Epi$Module.iCMS3_Up - proj_Epi$Module.iCMS3_Down
 
 sample.info.epi <- proj_Epi@cellColData %>% as.data.frame()
 colnames(sample.info.epi)
+
+sePeaks <- readRDS("sePeaks.cluster.rds")
+plot.data <- sePeaks@colData %>%
+    as.data.frame() %>%
+    mutate("Epi_Group" = "none")
+plot.data[c("C3", "C4"), ]$Epi_Group <- "Normal"
+plot.data[rownames(cluster.info), ]$Epi_Group <- cluster.info$Epi_Group
+plot.data <- plot.data[plot.data$Epi_Group != "none", ]
+
+pdf("Dot.Module.iCMS.clusters.pdf", 5, 3.7)
+ggplot(plot.data, aes(x = Module.iCMS2, y = Module.iCMS3)) +
+    geom_point(aes(color = Epi_Group), size = 2) +
+    stat_ellipse(aes(group = Epi_Group, color = Epi_Group), level = 0.95) +
+    scale_color_manual(values = mycolor$Epi_Group) +
+    ggpubr::stat_cor() +
+    theme_classic()
+dev.off()
+
 plot.data <- sample.info.epi %>%
     filter(Epi_type == "Malignant") %>%
     select(matches("Module|Group"))
 
-get_density <- function(x, y, nbins = 100, ...) {
-    dens <- MASS::kde2d(x, y, n = nbins, ...)
-    ix <- findInterval(x, dens$x)
-    iy <- findInterval(y, dens$y)
-    ii <- cbind(ix, iy)
-    return(dens$z[ii])
-}
-
-plot.data$Density <- get_density(plot.data$Module.iCMS2, plot.data$Module.iCMS3)
-
-pdf("Dot.Module.iCMS.pdf", 5, 3.7)
+pdf("Dot.Module.iCMS.cells.pdf", 5, 3.7)
 ggplot(plot.data, aes(x = Module.iCMS2, y = Module.iCMS3)) +
     geom_point(aes(color = Epi_Group), size = 0.6) +
     stat_ellipse(aes(group = Epi_Group), level = 0.9) +
