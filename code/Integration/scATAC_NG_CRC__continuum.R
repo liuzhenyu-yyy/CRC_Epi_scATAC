@@ -1,3 +1,11 @@
+#######################################################
+#
+# Re-analysis of Nature Genetics CRC 10X scATAC continuum
+# Data source: NCBI Gene Expression Omnibus GSE201349
+# Citation: https://www.nature.com/articles/s41588-022-01088-x
+#
+#####################################################
+
 setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/07.Independent_Validation")
 load("Independent_Validation.ATAC.RData")
 
@@ -383,10 +391,11 @@ dev.off()
 
 rm(v, p, plot.data)
 rm(marker.peak.NG)
-save.image("Independent_Validation.ATAC.RData")
 
 # 3. TF modules ----
-## 3.1. add Motif matrix ----
+library(WGCNA)
+
+## 3.1. Motif matrix and module eigengene ----
 proj_NG <- saveArchRProject(proj_NG, load = TRUE)
 proj_NG <- loadArchRProject("./Project_Dir_NG")
 proj_NG@peakAnnotation
@@ -414,6 +423,7 @@ seMotif.cluster <- getGroupSE(
     divideN = TRUE,
     scaleTo = NULL
 )
+
 dim(seMotif.cluster)
 rowData(seMotif.cluster)
 seMotif.cluster <- seMotif.cluster[rowData(seMotif.cluster)$seqnames == "deviations", ]
@@ -425,7 +435,101 @@ rownames(MotifMat.cluster)
 MotifMat.cluster["ENSG00000250542_156", ]
 MotifMat.cluster <- MotifMat.cluster[rownames(MotifMat.cluster) != "ENSG00000250542_156", ]
 MotifMat.cluster <- t(MotifMat.cluster)
-
-cluster.info <- readRDS("../04.Epi_CIMP/cluster.info.rds")
-MotifMat.cluster <- MotifMat.cluster[rownames(cluster.info), ]
+MotifMat.cluster <- as.data.frame(MotifMat.cluster)
 rm(seMotif.cluster)
+
+net <- readRDS("../05.Epi_TF_Clustering/WGCNA.net.rds")
+ME.NG <- moduleEigengenes(MotifMat.cluster,
+    colors = net$colors
+)
+ME.NG <- ME.NG$eigengenes
+
+## 3.2 identify iCMS subtypes ----
+markers.iCMS <- read.table("E:/LabWork/Project/CRC_NGS_ATAC/iCMS markers.txt",
+    stringsAsFactors = FALSE,
+    sep = "\t", header = TRUE
+)
+markers.iCMS <- base::as.list(markers.iCMS) %>% sapply(function(x) setdiff(x, ""))
+markers.iCMS <- lapply(markers.iCMS, function(x) intersect(x, getFeatures(proj_Epi, useMatrix = "GeneScoreMatrix")))
+lapply(markers.iCMS, length)
+
+proj_NG <- addModuleScore(proj_NG,
+    useMatrix = "GeneScoreMatrix",
+    name = "Module",
+    features = markers.iCMS
+)
+proj_NG$Module.iCMS2 <- proj_NG$Module.iCMS2_Up - proj_NG$Module.iCMS2_Down
+proj_NG$Module.iCMS3 <- proj_NG$Module.iCMS3_Up - proj_NG$Module.iCMS3_Down
+
+cluster.malignant <- paste0("C", c(1:5, 22:24))
+
+sample.info.NG <- proj_NG@cellColData %>% as.data.frame()
+colnames(sample.info.NG)
+
+pdf("NG_ATAC/Violin.Module.iCMS.pdf", 6, 3)
+sample.info.NG %>%
+    subset(Clusters %in% cluster.malignant) %>%
+    select(Clusters, Module.iCMS2, Module.iCMS3) %>%
+    reshape2::melt(id.vars = "Clusters") %>%
+    mutate(
+        Clusters = factor(Clusters, levels = cluster.malignant),
+        iCMS = ifelse(Clusters %in% c("C1", "C2", "C3", "C4", "C5"), "iCMS2", "iCMS3")
+    ) %>%
+    ggplot(aes(x = Clusters, y = value, fill = iCMS)) +
+        geom_violin() +
+        scale_fill_manual(values = c("iCMS2" = "#283891", "iCMS3" = "#62b7e6")) +
+        facet_wrap(~variable, scales = "free_y") +
+        ylab("iCMS module signature") +
+    ylim(-1, 1) +
+    theme_classic()
+dev.off()
+
+cluster.info.NG <- data.frame(
+    row.names = cluster.malignant,
+    Clusters = cluster.malignant,
+    iCMS = ifelse(cluster.malignant %in% c("C1", "C2", "C3", "C4", "C5"), "iCMS2", "iCMS3")
+)
+
+cluster.info.NG <- cbind(cluster.info.NG, ME.NG[cluster.malignant, ])
+cluster.info.NG$ME5 <- 0 - cluster.info.NG$ME5
+
+pdf("NG_ATAC/Box.TF.module.all.iCMS.pdf", 10, 8)
+cluster.info.NG %>%
+    mutate(
+        iCMS = factor(iCMS, levels = c("iCMS2", "iCMS3")),
+        Clusters = factor(Clusters, levels = cluster.malignant)
+    ) %>%
+    reshape2::melt(id.vars = c("Clusters", "iCMS")) %>%
+    ggplot(aes(x = iCMS, y = value, fill = iCMS)) +
+    geom_boxplot(outlier.color = NA) +
+    geom_jitter(width = 0.2) +
+    scale_fill_manual(values = c("iCMS2" = "#283891", "iCMS3" = "#62b7e6")) +
+    ggpubr::stat_compare_means() +
+    facet_wrap(~variable, ncol = 5) +
+    ylab("Module eigengene") +
+    ylim(-0.5, 0.5) +
+    theme_classic()
+dev.off()
+
+pdf("NG_ATAC/Box.TF.module.iCMS.pdf", 8, 3)
+cluster.info.NG %>%
+    mutate(
+        iCMS = factor(iCMS, levels = c("iCMS2", "iCMS3")),
+        Clusters = factor(Clusters, levels = cluster.malignant)
+    ) %>%
+    select(c("Clusters", "iCMS", "ME5", "ME8", "ME10", "ME11")) %>%
+    reshape2::melt(id.vars = c("Clusters", "iCMS")) %>%
+    ggplot(aes(x = iCMS, y = value, fill = iCMS)) +
+    geom_boxplot(outlier.color = NA) +
+    geom_jitter(width = 0.2) +
+    scale_fill_manual(values = c("iCMS2" = "#283891", "iCMS3" = "#62b7e6")) +
+    ggpubr::stat_compare_means() +
+    facet_wrap(~variable, ncol = 4) +
+    ylab("Module eigengene") +
+    ylim(-0.5, 0.5) +
+    theme_classic()
+dev.off()
+
+rm(p, plot.data, net)
+gc()
+save.image("Independent_Validation.ATAC.RData")
