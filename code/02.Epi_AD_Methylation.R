@@ -553,12 +553,28 @@ dim(betamat.peak) # 4736 peaks with probe
 ## 3.2. peak level heatmap ----
 anno.row <- data.frame(
     row.names = rownames(betamat.peak),
-    peak = rep("Down", length(rownames(betamat.peak))),
-    peakType = peakset[rownames(betamat.peak)]$peakType
+    Methylation = "not significant",
+    peak = rep("Down", length(rownames(betamat.peak)))
 )
-anno.row$peakType <- NULL
+
 anno.row[rownames(anno.row) %in% diff_peaks$AD_vs_NA$Up$peak_id, "peak"] <- "Up"
 table(anno.row$peak)
+anno.row$peak <- factor(anno.row$peak,
+    levels = c("Up", "Down")
+)
+
+temp <- data.frame(
+    row.names = rownames(betamat.peak),
+    beta_normal = rowMeans(betamat.peak[, sample.info.array$ID[sample.info.array$Location == "Normal"]], na.rm = TRUE),
+    beta_adenoma = rowMeans(betamat.peak[, sample.info.array$ID[sample.info.array$Location == "Adenoma"]], na.rm = TRUE)
+)
+anno.row$Methylation[temp$beta_adenoma - temp$beta_normal > 0.1] <- "Increased"
+anno.row$Methylation[temp$beta_adenoma - temp$beta_normal < -0.1] <- "Decreased"
+table(anno.row$Methylation)
+anno.row$Methylation <- factor(anno.row$Methylation,
+    levels = c("Increased", "Decreased", "not significant")
+)
+table(anno.row$peak, anno.row$Methylation)
 
 anno.col <- sample.info.array %>%
     select(Location)
@@ -573,21 +589,27 @@ p <- pheatmap(betamat.peak,
     annotation_row = anno.row,
     annotation_colors = list(
         "Location" = mycolor$Epi_type,
-        "peak" = mycolor$peak
+        "Methylation" = c("Increased" = "#cd2525", "Decreased" = "#1774cd"),
+        "peak" = mycolor$peak,
     )
 )
 
 # plot.data <- betamat.peak[p$tree_row$order, p$tree_col$order]
 plot.data <- betamat.peak[
-    order(rowMeans(betamat.peak[, sample.info.array[colnames(betamat.peak), ]$Location == "Normal"])),
+    order(
+        anno.row$peak,
+        # anno.row$Methylation,
+        rowMeans(betamat.peak[, sample.info.array[colnames(betamat.peak), ]$Location == "Normal"], na.rm = TRUE) *
+            ifelse(anno.row$peak == "Up", -1, 1)
+    ),
     p$tree_col$order
 ]
 plot.data <- plot.data[order(rownames(plot.data) %in% diff_peaks$AD_vs_NA$Up$peak_id), ]
 plot.data <- plot.data[, order(sample.info.array[colnames(plot.data), ]$Location)]
 table(rownames(plot.data) %in% diff_peaks$AD_vs_NA$Up$peak_id)
-plot.data <- plot.data[c(1:1257, rev(1258:4736)), ]
+# plot.data <- plot.data[c(1:1257, rev(1258:4736)), ]
 
-pdf("Heatmap.beta.AD_vs_NA.all.type.pdf", 5.5, 6)
+pdf("Heatmap.beta.AD_vs_NA.all.type1.pdf", 5.5, 6)
 pheatmap(plot.data,
     scale = "none",
     color = colorRampPalette(c("#3a2f99", "#d2cc02"))(100),
@@ -600,7 +622,7 @@ pheatmap(plot.data,
     annotation_colors = list(
         "Location" = mycolor$Epi_type,
         "peak" = mycolor$peak,
-        "peakType" = mycolor$peakType
+        "Methylation" = c("Increased" = "#fbb025", "Decreased" = "#44aaee", "not significant" = "gray50")
     ),
     gaps_row = c(1257)
 )
