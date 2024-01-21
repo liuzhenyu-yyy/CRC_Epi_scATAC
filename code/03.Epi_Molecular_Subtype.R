@@ -1035,6 +1035,92 @@ for (one in p) {
     plot(one)
 }
 dev.off()
+
+# correlation of motif deviation and gene score
+marker.gene.vs.Normal <- getMarkerFeatures(
+    ArchRProj = proj_Epi,
+    useMatrix = "GeneScoreMatrix",
+    groupBy = "Epi_Group",
+    useGroups = c("Group_1", "Group_2"),
+    bgdGroups = "Normal"
+)
+TF.all <- getFeatures(proj_Epi, useMatrix = "MotifMatrix") %>%
+    grep("deviations:", ., value = TRUE) %>%
+        gsub("deviations:", "", .)
+
+names(TF.all) <- TF.all  %>%
+    gsub("_.+?$", "", .)
+
+TF.all <- TF.all[names(TF.all) %in% marker.gene.vs.Normal@elementMetadata$name]
+
+MeanDiff <- marker.motif.vs.Normal@assays@data$MeanDiff
+colnames(MeanDiff) <- c("Group_1", "Group_2")
+rownames(MeanDiff) <- marker.motif.vs.Normal@elementMetadata$name
+MeanDiff <- MeanDiff[TF.all, ]
+
+FDR <- marker.motif.vs.Normal@assays@data$FDR
+colnames(FDR) <- c("Group_1", "Group_2")
+rownames(FDR) <- marker.motif.vs.Normal@elementMetadata$name
+FDR <- FDR[TF.all, ]
+
+Log2FC <- marker.gene.vs.Normal@assays@data$Log2FC
+colnames(Log2FC) <- c("Group_1", "Group_2")
+rownames(Log2FC) <- marker.gene.vs.Normal@elementMetadata$name
+Log2FC <- Log2FC[names(TF.all), ]
+
+
+plot(MeanDiff$Group_1, Log2FC$Group_1)
+plot.data.1 <- data.frame(
+    row.names = names(TF.all),
+    TF = names(TF.all),
+    motif.diff = MeanDiff$Group_1,
+    FDR = FDR$Group_1,
+    gene.diff = Log2FC$Group_1,
+    iCMS = "iCMS3"
+)
+
+plot.data.2 <- data.frame(
+    row.names = names(TF.all),
+    TF = names(TF.all),
+    motif.diff = MeanDiff$Group_2,
+    FDR = FDR$Group_2,
+    gene.diff = Log2FC$Group_2,
+    iCMS = "iCMS2"
+)
+plot.data.1["FOXA3", ]
+plot.data <- rbind(plot.data.1, plot.data.2)
+TF.selected <- c(
+    "NRF2", "MAFB",
+    "MAFK", "FOXA3", "FOXA2", "FOXM1", "SOX2", "SOX4",
+    "ELF1", "EHF", "ETS1",
+    "AP-1", "LEF1", "TCF3",
+    "NUR77", "HNF1", "CDX2", "PPARA", "TR4", "HNF4A"
+)
+TF.selected <- c(TF.selected, consensus.TF$iCMS2, consensus.TF$iCMS3)
+plot.data$Label <- plot.data$TF
+plot.data$Label[!plot.data$TF %in% TF.selected] <- NA
+
+plot.data$m_log10_FDR <- -log10(plot.data$FDR)
+plot.data$m_log10_FDR[plot.data$m_log10_FDR > 50] <- 50
+
+pdf("TF_motif/Scatter.TF.GS.deviation.pdf", 8, 4)
+ggplot(plot.data, aes(x = motif.diff, y = gene.diff)) +
+    geom_point(aes(color = m_log10_FDR)) +
+    ggrepel::geom_text_repel(aes(label = Label), size = 2.5, max.overlaps = 50) +
+    facet_wrap(~iCMS, ncol = 2, scales = "free") +
+    scale_color_viridis_c() +
+    theme_bw()
+dev.off()
+
+pdf("TF_motif/Scatter.TF.GS.deviation.all.pdf", 8, 4)
+ggplot(plot.data, aes(x = motif.diff, y = gene.diff)) +
+    geom_point(aes(color = m_log10_FDR)) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 2.5, max.overlaps = 15) +
+    facet_wrap(~iCMS, ncol = 2, scales = "free") +
+    scale_color_viridis_c() +
+    theme_bw()
+dev.off()
+
 rm(p, one, TF.CISBP)
 
 ## 5.4. select for visulization ----
@@ -1767,7 +1853,7 @@ p1 <- ggplot(plot.data) +
         scale_fill_manual(values = c("iCMS2" = "#283891", "iCMS3" = "#62b7e6")) +
         theme_bw() +
         geom_vline(xintercept = 11.5, linetype = 2) +
-        xlab("Number of clusters") + 
+        xlab("Number of clusters") +
         ylab("Number of TFs")
 consensus.TF <- list()
 consensus.TF$iCMS2 <- as.character(plot.data$Var1)[plot.data$Freq > 11.5]
