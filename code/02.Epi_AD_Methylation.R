@@ -550,6 +550,7 @@ plot.data$n_Up_Malignant <- plot.data$n_Up - plot.data$n_Up_Adenoma
 plot.data$n_Down_Malignant <- plot.data$n_Down - plot.data$n_Down_Adenoma
 plot.data$n_Up <- NULL
 plot.data$n_Down <- NULL
+
 plot.data <- reshape2::melt(plot.data, id.vars = "Cluster")
 plot.data$value[grep("Down", plot.data$variable)] <- plot.data$value[grep("Down", plot.data$variable)] * -1
 plot.data$variable <- factor(plot.data$variable,
@@ -559,6 +560,10 @@ plot.data$variable <- factor(plot.data$variable,
 cluster.rename <- read.table("../01.All_scCNV/cluster_rename.txt", header = TRUE)
 rownames(cluster.rename) <- cluster.rename$Cluster
 plot.data$Cluster_rename <- cluster.rename[plot.data$Cluster, "manual"]
+plot.data$Cluster_rename <- factor(plot.data$Cluster_rename,
+    levels = paste("C",5:29, sep = "")
+)
+table(plot.data$Cluster_rename)
 
 pdf("Barplot.cluster.tumor.peak.in.adenoma.pdf", 6, 3)
 ggplot(plot.data, aes(x = Cluster_rename, y = value / 1000, fill = variable)) +
