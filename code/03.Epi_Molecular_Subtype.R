@@ -1995,6 +1995,80 @@ ggplot(cTF.peak.stat, aes(x = n_Peak, y = frac_cPeak)) +
     theme_bw()
 dev.off()
 
+# 8. Test 6-rank NMF ----
+dir.create("NMF_r6")
+## 8.1 run NMF with 6 clusters ----
+sePeaks <- readRDS("sePeaks.cluster.rds")
+NMF.res.6 <- nmf(
+    sePeaks@assays@data$PeakMatrix[feature.selcted, sample.selected],
+    rank = 6,
+    nrun = 200
+)
+rm(sePeaks)
+
+group.res.6 <- predict(NMF.res.6, what = "consensus") %>%
+    as.numeric()
+group.res.6 <- group.res.6 %>%
+    paste("Group_", ., sep = "")
+names(group.res.6) <- sample.selected
+
+## 8.2. visualize NMF results ----
+# conseusus matrix
+con.mat <- NMF.res.6@consensus
+sil <- silhouette(NMF.res.6, what = "consensus")
+
+cluster.info2 <- read.table("../04.Epi_CIMP/cluster.info.csv", header = TRUE, sep = ",", row.names = 1)
+identical(rownames(cluster.info2), rownames(cluster.info))
+cluster.info$CIMP_Group <- cluster.info2[rownames(cluster.info), "CIMP_Group"]
+rm(cluster.info2)
+
+anno.col <- cluster.info %>%
+    select(c("Gender_Major", "MSI_Status_Major", "Side_Major", "iCMS", "CIMP_Group"))
+colnames(anno.col) <- c(names(mycolor)[c(1:3, 6)], "CIMP")
+
+anno.col$silhouette <- sil[, 3][rownames(anno.col)]
+anno.col$NMF_r6 <- group.res.6[rownames(anno.col)]
+mycolor$CIMP <- c("CIMP_Negative" = "#89dc0e", "CIMP_Low" = "#fbe625", "CIMP_High" = "#f76960")
+mycolor$NMF_r6 <- ArchR::paletteDiscrete(anno.col$NMF_r6)
+
+cluster.rename <- read.table("../01.All_scCNV/cluster_rename.txt", header = TRUE)
+rownames(cluster.rename) <- cluster.rename$Cluster
+
+rownames(anno.col) <- cluster.rename[rownames(anno.col), "manual"]
+colnames(con.mat) <- cluster.rename[colnames(con.mat), "manual"]
+rownames(con.mat) <- cluster.rename[rownames(con.mat), "manual"]
+
+pdf("NMF_r6/NMF.consensus.clusters.pdf", 7, 6)
+pheatmap::pheatmap(con.mat,
+    annotation_col = anno.col[, c(6, 2, 3, 5, 4, 7)],
+    annotation_colors = mycolor[colnames(anno.col)],
+    border_color = NA,
+    cutree_rows = 6,
+    cutree_cols = 6
+)
+dev.off()
+
+# coefficient matrix
+coefmap(NMF.res.6)
+coef.mat <- coef(NMF.res.6)
+rownames(coef.mat) <- paste("Basis", 1:6, sep = "")
+write.csv(coef.mat, "NMF_r6/NMF.coefficient.clusters.csv")
+colnames(coef.mat) <- cluster.rename[colnames(coef.mat), "manual"]
+
+pdf("NMF_r6/NMF.coefficient.clusters.pdf", 6, 3)
+pheatmap(coef.mat,
+    annotation_col = anno.col[c(4, 5, 7)],
+    annotation_colors = mycolor[colnames(anno.col)],
+    cluster_cols = TRUE,
+    cluster_rows = TRUE,
+    border_color = NA,
+    clustering_method = "ward.D2",
+)
+dev.off()
+
+rm(con.mat, coef.mat, sil, p, anno.col)
+
+
 gc()
 write.csv(cluster.info, "cluster.info.csv")
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
