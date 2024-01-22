@@ -924,5 +924,134 @@ pdf("TF_gene_module/Scatter.TF_Module_iCMS.pdf", 8, 5)
 patchwork::wrap_plots(p.list, ncol = 3)
 dev.off()
 
+# 7. module and epi cell type ----
+dir.create("TF_Adenoma")
+
+## 7.1. prepare data ----
+ME.all <- moduleEigengenes(MotifMat.cluster,
+    colors = net$colors
+)
+ME.all <- ME.all$eigengenes
+
+# check direction
+temp <- c()
+for (one in colnames(ME.all)) {
+    temp <- c(temp, cor(ME.all[rownames(MEs), one], MEs[, one]))
+}
+sum(temp < 0)
+
+datTraits.all <- data.frame(
+    row.names = rownames(ME.all),
+    Clusters = rownames(ME.all),
+    "Epi_type" = rep("Malignant", 29)
+)
+datTraits.all[datTraits.all$Clusters %in% c("C3", "C4"), ]$Epi_type <- "Normal"
+datTraits.all[datTraits.all$Clusters %in% c("C28", "C9"), ]$Epi_type <- "Adenoma"
+datTraits.all$Epi_type <- factor(datTraits.all$Epi_type,
+    levels = c("Normal", "Adenoma", "Malignant")
+) %>% as.numeric()
+datTraits.all$is_Normal <- ifelse(datTraits.all$Epi_type == 1, 1, 0)
+datTraits.all$is_Adenoma <- ifelse(datTraits.all$Epi_type == 2, 1, 0)
+datTraits.all$is_Malignant <- ifelse(datTraits.all$Epi_type == 3, 1, 0)
+datTraits.all$Clusters <- NULL
+
+## 7.2. correlation between module and epi cell type ----
+identical(rownames(datTraits.all), rownames(ME.all))
+cor.module.trait <- cor(ME.all, datTraits.all, use = "p")
+p.module.trait <- corPvalueStudent(cor.module.trait, nrow(ME.all))
+cor.module.trait <- t(cor.module.trait) %>% as.data.frame()
+p.module.trait <- t(p.module.trait) %>% as.data.frame()
+
+orders <- gsub("ME", "", colnames(cor.module.trait)) %>%
+    as.numeric() %>%
+    order() %>%
+    .[2:length(.)]
+pdf("TF_Adenoma/Heatmap.cor.Module_Epi_Type.pdf", 3, 5)
+corrplot(
+    t(as.matrix(cor.module.trait[, orders])),
+    method = "square",
+    # addCoef.col = "black",
+    tl.col = "black",
+    tl.cex = 1,
+    p.mat = t(as.matrix(p.module.trait[, orders])),
+    sig.level = c(0.001, 0.01, 0.05),
+    pch.cex = 1.3,
+    insig = "label_sig",
+    col = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100)
+)
+dev.off()
+
+## 7.3. enrichment-defined modules ----
+# identify sig TFs
+homer.res.ad <- list(
+    "Up" = homer.parser(paste0("../02.Epi_AD_Methylation/homer/AD_Up/knownResults.txt"),
+        log.p.value = 50, log2.enrichment = 0.5
+    ),
+    "Down" = homer.parser(paste0("../02.Epi_AD_Methylation/homer/AD_Down/knownResults.txt"),
+        log.p.value = 50, log2.enrichment = 0.5
+    )
+) %>% sapply(function(x) {
+    x <- x %>%
+        filter(Diff == "up") %>%
+        pull(TF) %>%
+        paste(.,"_",sep = "") %>%
+        paste(collapse = "|")
+})
+
+module.AD <- net$colors - net$colors
+module.AD[grep(homer.res.ad["Up"], names(module.AD), value = TRUE)] <- 1
+module.AD[grep(homer.res.ad["Down"], names(module.AD), value = TRUE)] <- 2
+table(module.AD)
+
+# get module eigengene
+ME.all <- moduleEigengenes(MotifMat.cluster,
+    colors = module.AD
+)
+ME.all <- ME.all$eigengenes
+colnames(ME.all) <- c("Others", "Module.AD_Up", "Module.AD_Down")
+
+# correlation
+identical(rownames(datTraits.all), rownames(ME.all))
+cor.module.trait <- cor(ME.all[c("C3", "C4", "C9", "C28"), ],
+    datTraits.all[c("C3", "C4", "C9", "C28"), 1:3],
+    use = "p"
+)
+p.module.trait <- corPvalueStudent(cor.module.trait, nrow(ME.all))
+cor.module.trait <- t(cor.module.trait) %>% as.data.frame()
+p.module.trait <- t(p.module.trait) %>% as.data.frame()
+
+orders <- 1:3
+pdf("TF_Adenoma/Heatmap.cor.AD.TF.Epi_Type.pdf", 4, 4)
+corrplot(
+    t(as.matrix(cor.module.trait[, orders])),
+    method = "square",
+    # addCoef.col = "black",
+    tl.col = "black",
+    tl.cex = 1,
+    p.mat = t(as.matrix(p.module.trait[, orders])),
+    sig.level = c(0.001, 0.01, 0.05),
+    pch.cex = 1.3,
+    insig = "label_sig",
+    col = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100)
+)
+dev.off()
+
+plot.data <- cbind(
+    ME.all[c("C3", "C4", "C9", "C28"), ],
+    datTraits.all[c("C3", "C4", "C9", "C28"), 1:3]
+) %>%
+    mutate(
+        "Clusters" = rownames(.),
+        "Epi_type" = c("Normal", "Normal", "Adenoma", "Adenoma")
+    )
+
+ggplot(plot.data, aes(x = Epi_type, y = Module.AD_Down)) +
+    #geom_boxplot(aes(fill = Epi_type), show.legend = FALSE) +
+    geom_point(aes(color = Epi_type), show.legend = FALSE) +
+    scale_fill_manual(values = mycolor$Epi_Group) +
+    ggpubr::stat_compare_means() +
+    theme_classic() +
+    ylab("Module Eigenvalue")
+
 gc()
 save.image("05.Epi_TF_Clustering.RData")

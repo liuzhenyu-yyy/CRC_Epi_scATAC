@@ -136,6 +136,63 @@ ggplot(plot.data) +
 dev.off()
 rm(regionDB, plot.data)
 
+## 1.4. motif enrichment of AD peaks ----
+dir.create("Homer")
+write.table(
+    diff_peaks$AD_vs_NA$Up$peak_id %>%
+        gsub("_", "\t", .) %>%
+        as.data.frame() %>%
+        mutate(
+            "Name" = diff_peaks$AD_vs_NA$Up$peak_id,
+            "length" = 500,
+            "strand" = "."
+        ),
+    "Homer/marker.peak.AD_vs_NA.Up.bed",
+    col.names = FALSE,
+    sep = "\t", quote = FALSE, row.names = FALSE
+)
+write.table(
+    diff_peaks$AD_vs_NA$Down$peak_id %>%
+        gsub("_", "\t", .) %>%
+        as.data.frame() %>%
+        mutate(
+            "Name" = diff_peaks$AD_vs_NA$Down$peak_id,
+            "length" = 500,
+            "strand" = "."
+        ),
+    "Homer/marker.peak.AD_vs_NA.Down.bed",
+    col.names = FALSE,
+    sep = "\t", quote = FALSE, row.names = FALSE
+)
+
+# /mnt/d/WSL2/homer/bin/findMotifsGenome.pl ./marker.peak.AD_vs_NA.Up.bed hg38 ./AD_Up/ -size 200
+homer.res.ad <- list(
+    "Up" = homer.parser(paste0("homer/AD_Up/knownResults.txt"),
+        log.p.value = 50, log2.enrichment = 0.5
+    ),
+    "Down" = homer.parser(paste0("homer/AD_Down/knownResults.txt"),
+        log.p.value = 50, log2.enrichment = 0.5
+    )
+)
+pdf("homer/Dot.motif.AD.Up.pdf", 5, 4)
+ggplot(homer.res.ad$Up, aes(x = Log2_Enrichment, y = log.p.value)) +
+    geom_point(aes(color = Diff), size = 1) +
+    geom_vline(xintercept = 0.5, linetype = "dashed") +
+    geom_hline(yintercept = 50, linetype = "dashed") +
+    scale_color_manual(values = c("none" = "grey", "up" = "red")) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
+    theme_classic()
+dev.off()
+pdf("homer/Dot.motif.AD.Down.pdf", 5, 4)
+ggplot(homer.res.ad$Down, aes(x = Log2_Enrichment, y = log.p.value)) +
+    geom_point(aes(color = Diff), size = 1) +
+    geom_vline(xintercept = 0.5, linetype = "dashed") +
+    geom_hline(yintercept = 50, linetype = "dashed") +
+    scale_color_manual(values = c("none" = "grey", "up" = "red")) +
+    ggrepel::geom_text_repel(aes(label = TF), size = 2, max.overlaps = 30) +
+    theme_classic()
+dev.off()
+
 # 2. AD diff peak keep in cancer ----
 ## 2.1. overlap with cancer peaks & CGI ----
 v <- Venn(list(
@@ -446,7 +503,7 @@ ggplot(plot.data, aes(x = Epi_type, y = Mean)) +
 dev.off()
 rm(plot.data)
 
-## 2.4 percent of tumor peaks in adenoma ----
+## 2.4. percent of tumor peaks in adenoma ----
 cluster.info <- readRDS("../03.Epi_Molecular_Subtype/cluster.info.rds")
 
 peaks.clusters.up <- list()
