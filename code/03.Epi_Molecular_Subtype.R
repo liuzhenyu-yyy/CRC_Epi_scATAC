@@ -300,7 +300,7 @@ plot.data$Epi_Group <- factor(plot.data$Epi_Group,
 )
 p1 <- ggplot(plot.data) +
     geom_bar(aes(x = Epi_Group, y = Freq, fill = MSI_Status_Major),
-        stat = "identity", position =  position_fill(reverse = TRUE)
+        stat = "identity", position = position_fill(reverse = TRUE)
     ) +
     geom_text(aes(x = Epi_Group, y = Freq, label = Freq),
         position = position_fill(vjust = 0.5)
@@ -309,6 +309,12 @@ p1 <- ggplot(plot.data) +
         coord_flip() +
         theme_classic() +
         theme(axis.title = element_blank(), axis.text.x = element_blank())
+
+cluster.info %>%
+    # filter(MSI_Status_Major != "NA") %>%
+    select(c("Epi_Group", "MSI_Status_Major")) %>%
+    table() %>%
+    chisq.test()
 
 ## Side
 plot.data <- table(cluster.info %>%
@@ -325,9 +331,14 @@ p2 <- ggplot(plot.data) +
         position = position_fill(vjust = 0.5)
     ) +
     scale_fill_manual(values = mycolor$Side) +
-    coord_flip() +
-    theme_classic() +
+        coord_flip() +
+        theme_classic() +
         theme(axis.title = element_blank(), axis.text.x = element_blank())
+
+cluster.info %>%
+    select(c("Epi_Group", "Side_Major")) %>%
+    table() %>%
+    chisq.test()
 
 ## Gender
 plot.data <- table(cluster.info %>%
@@ -346,8 +357,12 @@ p3 <- ggplot(plot.data) +
     scale_fill_manual(values = mycolor$Gender) +
         coord_flip() +
         theme_classic() +
-        theme(axis.title.y = element_blank(), axis.title.y = element_blank()) +
+        theme(axis.title.y = element_blank()) +
         ylab("Fraction")
+cluster.info %>%
+    select(c("Epi_Group", "Gender_Major")) %>%
+    table() %>%
+    chisq.test()
 
 pdf("Bar.Clinical.Group.pdf", 6, 4)
 wrap_plots(p1, p2, p3, ncol = 1)
@@ -368,7 +383,7 @@ colnames(anno.row)[2] <- "MSI"
 CNV.FC <- CNV.FC[cell.selected, ]
 
 png("Heatmap.CNV.cell.wardd2.png", 1000, 750)
-pheatmap::pheatmap(CNV.FC,
+p <- pheatmap::pheatmap(CNV.FC,
     color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
     border_color = FALSE,
     cluster_rows = TRUE, cluster_cols = FALSE,
@@ -382,6 +397,9 @@ pheatmap::pheatmap(CNV.FC,
     gaps_col = which(!duplicated(anno.col$seqnames)) - 1
 )
 dev.off()
+CNV.cluster <- cutree(p$tree_row, k = 2)
+identical(names(CNV.cluster), rownames(anno.row))
+table(CNV.cluster, anno.row$Epi_Group) %>% chisq.test()
 
 rm(CNV.FC, anno.col, anno.row, anno.color)
 
@@ -1067,7 +1085,6 @@ Log2FC <- marker.gene.vs.Normal@assays@data$Log2FC
 colnames(Log2FC) <- c("Group_1", "Group_2")
 rownames(Log2FC) <- marker.gene.vs.Normal@elementMetadata$name
 Log2FC <- Log2FC[names(TF.all), ]
-
 
 plot(MeanDiff$Group_1, Log2FC$Group_1)
 plot.data.1 <- data.frame(

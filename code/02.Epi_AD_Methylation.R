@@ -467,6 +467,15 @@ plot.data <- data.frame(
 plot.data$Epi_type <- factor(plot.data$Epi_type,
     levels = c("Normal", "Adenoma", "Malignant")
 )
+
+wilcox.test(
+    cluster.info[cluster.info$Epi_type == "Normal", "Mean_AD_Up"],
+    cluster.info[cluster.info$Epi_type == "Adenoma", "Mean_AD_Up"]
+)
+wilcox.test(
+    cluster.info[cluster.info$Epi_type == "Adenoma", "Mean_AD_Up"],
+    cluster.info[cluster.info$Epi_type == "Malignant", "Mean_AD_Up"]
+)
 pdf("Line.Cluster.AD_vs_NA.Up.pdf", 4, 3)
 ggplot(plot.data, aes(x = Epi_type, y = Mean)) +
     geom_line(aes(group = 1), size = 1, color = "#cd2525") +
@@ -705,6 +714,16 @@ plot.data <- data.frame(
 plot.data$Location <- factor(plot.data$Location,
     levels = c("Normal", "Adenoma", "Malignant")
 )
+
+wilcox.test(
+    sample.info.array[sample.info.array$Location == "Normal", "Mean_AD_Up"],
+    sample.info.array[sample.info.array$Location == "Adenoma", "Mean_AD_Up"]
+)
+wilcox.test(
+    sample.info.array[sample.info.array$Location == "Adenoma", "Mean_AD_Up"],
+    sample.info.array[sample.info.array$Location == "Malignant", "Mean_AD_Up"]
+)
+
 pdf("Line.beta.Cluster.AD_vs_NA.Up.pdf", 4, 3)
 ggplot(plot.data, aes(x = Location, y = Mean)) +
     geom_line(aes(group = 1), size = 1, lty = 2, color = "#cd2525") +
@@ -715,7 +734,7 @@ ggplot(plot.data, aes(x = Location, y = Mean)) +
     theme_classic() +
     scale_color_manual(values = mycolor$Epi_type) +
     scale_x_discrete(expand = c(0.02, 0.05)) +
-        scale_y_continuous(labels = c(0.4,0.5,0.6), breaks = c(0.4,0.5,0.6)) +
+    scale_y_continuous(labels = c(0.4, 0.5, 0.6), breaks = c(0.4, 0.5, 0.6)) +
     ylab("Mean beta value")
 dev.off()
 
@@ -727,6 +746,15 @@ plot.data <- data.frame(
 plot.data$Location <- factor(plot.data$Location,
     levels = c("Normal", "Adenoma", "Malignant")
 )
+wilcox.test(
+    sample.info.array[sample.info.array$Location == "Normal", "Mean_AD_Down"],
+    sample.info.array[sample.info.array$Location == "Adenoma", "Mean_AD_Down"]
+)
+wilcox.test(
+    sample.info.array[sample.info.array$Location == "Adenoma", "Mean_AD_Down"],
+    sample.info.array[sample.info.array$Location == "Malignant", "Mean_AD_Down"]
+)
+
 pdf("Line.beta.Cluster.AD_vs_NA.Down.pdf", 4, 3)
 ggplot(plot.data, aes(x = Location, y = Mean)) +
     geom_line(aes(group = 1), size = 1, lty = 2, color = "#1774cd") +
