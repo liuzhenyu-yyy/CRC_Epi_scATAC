@@ -1,5 +1,15 @@
 #!/bin/sh
 
+##########################################################
+###
+### Data processing for scATAC-seq #1
+### Input: single-cell demultiplexed pari-end fastq
+### Output: sorted bam file
+### Author: Zhenyu Liu
+### Email:  liuzhenyu@pku.edu.cn
+### 
+##########################################################
+
 cell=$1
 ref=$2
 rawdata_dir=$3
@@ -8,6 +18,10 @@ ref_dir=/gpfs1/tangfuchou_pkuhpc/tangfuchou_coe/liuzhenyu/database/${ref}/hisat2
 
 mkdir -p ${cell}
 cd ${cell}
+
+#==========================================================================
+#      Step2 Trim ME sequence
+#==========================================================================
 
 # trim ME sequence
 mkdir -p trim_fq
@@ -25,7 +39,9 @@ cutadapt \
     ${rawdata_dir}/${cell}/${cell}_2.fq.gz
 
 
-# hisat2 mapping
+#==========================================================================
+#      Step3 Genome mapping
+#==========================================================================
 mkdir mapping
 
 hisat2 \
@@ -39,7 +55,9 @@ hisat2 \
     samtools view -ShuF 4 -f 2 -q 30 - | \
     samtools sort - -o mapping/${cell}_f2q30.bam
 
-# picard mark duplication
+#==========================================================================
+#      Step4 remove duplication
+#==========================================================================
 java -jar -Xmx4g \
     /gpfs1/tangfuchou_pkuhpc/tangfuchou_coe/liuzhenyu/software/picard_2.19.0/picard.jar \
     MarkDuplicates \

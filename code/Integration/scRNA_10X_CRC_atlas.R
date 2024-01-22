@@ -9,6 +9,7 @@
 setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/07.Independent_Validation")
 load("Independent_Validation.RNA.RData")
 source("../../code/00.Requirements.R")
+library(Seurat)
 proj_Epi <- loadArchRProject(project.dir.epi, force = TRUE)
 
 # 1. Primary analysis of CRC 10X atlas -----
@@ -185,7 +186,7 @@ marker.10X.list <- list(
 
 table(epi.obj$Class, epi.obj$Patient)
 
-## 2.3. marker patient ----
+## 2.3. marker my patient ----
 epi.obj$iCMS <- "none"
 epi.obj$iCMS[grep("CMS1", epi.obj$Cell_subtype)] <- "iCMS3"
 epi.obj$iCMS[grep("CMS2", epi.obj$Cell_subtype)] <- "iCMS2"
@@ -337,6 +338,64 @@ dev.off()
 
 length(markers.iCMS$iCMS2_Up) / length(unlist(marker.10x.patient.up) %>% unique())
 rm(plot.data, plot.data.nor, anno.row, anno.col, patients, one, temp, temp2)
+
+## 2.5 expression of selected TFs ----
+# iCMS TFs
+TF.selected <- c(
+    "NFE2L2", "MAFB", "MAFK", "FOXA3", "FOXA2", "FOXM1", "SOX2", "SOX4", "ELF1", "EHF",
+    "ETS1", "JUN", "LEF1", "TCF3", "NR4A1", "HNF1A", "CDX2", "PPARA", "NR2C2", "HNF4A"
+)
+
+epi.obj$iCMS
+p <- Seurat::DotPlot(epi.obj, features = TF.selected, group.by = "iCMS", scale = FALSE)
+plot.data <- p$data
+
+plot.data.1 <- plot.data[plot.data$id == "iCMS2", ] %>%
+    .[TF.selected, ] %>%
+    mutate(id = "iCMS2")
+plot.data.2 <- plot.data[plot.data$id == "iCMS3", ] %>%
+    .[TF.selected, ] %>%
+    mutate(id = "iCMS3")
+plot.data <- rbind(plot.data.1, plot.data.2)
+plot.data$features.plot <- factor(c(TF.selected, TF.selected), levels = TF.selected)
+plot.data[plot.data$avg.exp > 4, ]$avg.exp <- 4
+
+pdf("NG_10X/Dot.motif.sig.iCMS.selected.pdf", 2.5, 4)
+ggplot(plot.data, aes(x = id, y = features.plot, fill = avg.exp, size = pct.exp)) +
+    geom_point(pch = 21) +
+    theme_bw() +
+    xlab("iCMS") +
+    scale_fill_gradientn(colors = ArchR::paletteContinuous()) +
+    scale_size_continuous(limits = c(0, 90)) +
+    ylab("TF")
+dev.off()
+
+# CIMP TFs
+TF.selected <- c(
+    "TCF7L2", "TCF7", "TCF3", "LEF1", "CREB5", "CDX4", "CDX2", "ATF2", "TEAD2", "TEAD1"
+)
+
+epi.obj$Epi_type <- ifelse(epi.obj$Patient_Tumor == "Normal", "Normal", "Malignant")
+table(epi.obj$Epi_type)
+
+p <- Seurat::DotPlot(epi.obj, features = TF.selected, group.by = "Epi_type", scale = FALSE)
+plot.data <- p$data
+
+plot.data <- plot.data[plot.data$id == "Malignant", ] %>%
+    .[TF.selected, ]
+
+plot.data$features.plot <- factor(c(TF.selected), levels = TF.selected)
+plot.data[plot.data$avg.exp > 4, ]$avg.exp <- 4
+
+pdf("NG_10X/Dot.motif.sig.CIMP.selected.pdf", 5, 1)
+ggplot(plot.data, aes(x = features.plot, y = id, fill = avg.exp, size = pct.exp)) +
+    geom_point(pch = 21) +
+    theme_bw() +
+    xlab("iCMS") +
+    scale_fill_gradientn(colors = ArchR::paletteContinuous()) +
+    scale_size_continuous(limits = c(0, 90)) +
+    ylab("TF")
+dev.off()
 
 # 3. Diff gene ----
 ## 3.1. TCGA RNA data ----

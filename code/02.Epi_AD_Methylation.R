@@ -561,7 +561,7 @@ cluster.rename <- read.table("../01.All_scCNV/cluster_rename.txt", header = TRUE
 rownames(cluster.rename) <- cluster.rename$Cluster
 plot.data$Cluster_rename <- cluster.rename[plot.data$Cluster, "manual"]
 plot.data$Cluster_rename <- factor(plot.data$Cluster_rename,
-    levels = paste("C",5:29, sep = "")
+    levels = paste("C", 5:29, sep = "")
 )
 table(plot.data$Cluster_rename)
 

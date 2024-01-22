@@ -1520,17 +1520,22 @@ plot.data <- homer.res.cluster %>%
         MSI_Status = cluster.info[.$Cluster, "MSI_Status_Major"]
     )
 
-plot.data$Cluster <- factor(plot.data$Cluster, levels = unique(plot.data$Cluster))
 plot.data$TF <- factor(plot.data$TF, levels = TF.selected)
 plot.data$Group <- ifelse(plot.data$TF %in% c("HNF4A", "PPARA", "NUR77", "HNF1", "TR4"), "iCMS2 TF", "iCMS3 TF")
 if (max(plot.data$log.p.value) > 500) {
     plot.data[plot.data$log.p.value > 500, ]$log.p.value <- 500
 }
 
-pdf("Cluster_level/Dot.TF.iCMS.cluster.pdf", 5, 6)
+cluster.rename <- read.table("../01.All_scCNV/cluster_rename.txt", header = TRUE)
+rownames(cluster.rename) <- cluster.rename$Cluster
+plot.data$Cluster_rename <- cluster.rename[plot.data$Cluster, "manual"]
+plot.data$Cluster_rename <- factor(plot.data$Cluster_rename,
+    levels = paste("C", 5:29, sep = "") %>% rev()
+)
+pdf("Cluster_level/Dot.TF.iCMS.cluster.rename.pdf", 5, 6)
 ggplot(plot.data) +
     geom_point(aes(
-        x = TF, y = Cluster,
+        x = TF, y = Cluster_rename,
         fill = log.p.value, size = Log2_Enrichment
     ), pch = 21) +
     scale_fill_viridis_c() +
