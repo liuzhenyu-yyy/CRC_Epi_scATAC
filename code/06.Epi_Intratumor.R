@@ -733,13 +733,13 @@ plot.data$TF <- factor(plot.data$TF, levels = (TF.selected.name))
 pdf("TF_motif/Violin.motif.sig.subclone.pdf", 8, 3.5)
 ggplot(plot.data, aes(x = Subclone, y = Deviation)) +
     geom_violin(aes(fill = Subclone), show.legend = FALSE) +
-    theme_bw() +
+    theme_classic() +
     ggpubr::stat_compare_means(
         method = "wilcox.test",
         comparisons = list(
             c("subclone_1", "subclone_3"), c("subclone_3", "subclone_5"),
              c("subclone_4", "subclone_5")
-        ), size = 2
+        ), size = 2, label = "p.signif"
     ) +
     facet_wrap(~TF, scales = "free") +
     labs(x = "Subclone", y = "Deviation") +

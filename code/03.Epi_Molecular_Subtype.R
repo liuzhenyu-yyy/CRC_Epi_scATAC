@@ -438,7 +438,7 @@ plot.data <- plot.data[plot.data$Epi_Group != "none", ]
 pdf("Dot.Module.iCMS.clusters.pdf", 5, 3.7)
 ggplot(plot.data, aes(x = Module.iCMS2, y = Module.iCMS3)) +
     geom_point(aes(color = Epi_Group), size = 2) +
-    stat_ellipse(aes(group = Epi_Group, color = Epi_Group), level = 0.95) +
+    stat_ellipse(aes(group = Epi_Group, color = Epi_Group), level = 0.9) +
     scale_color_manual(values = mycolor$Epi_Group) +
     ggpubr::stat_cor() +
     theme_classic()
@@ -1651,7 +1651,7 @@ peak.selected <- motif.match[, "PPARA"] %>%
     .[.] %>%
     names() %>%
     intersect(., unlist(peaks.clusters[cluster.selected]) %>% unique())
-length(peak.selected) # 9720 HNF4A peaks
+length(peak.selected) # 9720 PPARA peaks
 
 plot.data <- matrix(0, nrow = length(peak.selected), ncol = length(cluster.selected))
 rownames(plot.data) <- peak.selected
@@ -1663,8 +1663,8 @@ for (one in cluster.selected) {
 pdf("Cluster_level/Heatmap.PPARA.clusterPeaks.pdf", 10, 6)
 p <- pheatmap(
     t(plot.data)[c(
-        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
-        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
+        "C2", "C16", "C13", "C12", "C14", "C22", "C18", "C23", 
+        "C15", "C19", "C17", "C20", "C21", "C7", "C8"
     ), ],
     scale = "none",
     cluster_rows = FALSE,
@@ -1692,8 +1692,8 @@ anno.col <- data.frame(
 pdf("Cluster_level/Heatmap.PPARA.clusterPeaks.pdf", 10, 6)
 p <- pheatmap(
     t(plot.data)[c(
-        "C18", "C2", "C16", "C13", "C22", "C17", "C20",
-        "C12", "C21", "C19", "C7", "C23", "C14", "C15", "C8"
+        "C2", "C16", "C13", "C12", "C14", "C22", "C18", "C23",
+        "C15", "C19", "C17", "C20", "C21", "C7", "C8"
     ), ],
     scale = "none",
     cluster_rows = FALSE,
@@ -1823,8 +1823,8 @@ anno.col <- data.frame(
 pdf("Cluster_level/Heatmap.FOXA3.clusterPeaks.pdf", 10, 4.5)
 p <- pheatmap(
     t(plot.data)[c(
-        "C5", "C29", "C11", "C10", "C24", "C6", "C26", "C25",
-        "C27", "C1"
+        "C5", "C24", "C6", "C25", "C29", "C1", "C10", "C11", "C26",
+        "C27"
     ), ],
     scale = "none",
     cluster_rows = FALSE,

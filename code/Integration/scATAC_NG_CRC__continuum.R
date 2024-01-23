@@ -466,13 +466,18 @@ cluster.malignant <- paste0("C", c(1:5, 22:24))
 sample.info.NG <- proj_NG@cellColData %>% as.data.frame()
 colnames(sample.info.NG)
 
+temp <- sample.info.NG %>%
+    filter(Clusters %in% cluster.malignant)
+temp <- table(temp$Clusters, temp$Patient)
+colnames(temp)[apply(temp, 1, which.max)]
+
 pdf("NG_ATAC/Violin.Module.iCMS.pdf", 6, 3)
 sample.info.NG %>%
     subset(Clusters %in% cluster.malignant) %>%
     select(Clusters, Module.iCMS2, Module.iCMS3) %>%
     reshape2::melt(id.vars = "Clusters") %>%
     mutate(
-        Clusters = factor(Clusters, levels = cluster.malignant),
+        Clusters = factor(Clusters, levels = c("C2", "C3", "C5","C1", "C4", "C22", "C23", "C24")),
         iCMS = ifelse(Clusters %in% c("C1", "C2", "C3", "C4", "C5"), "iCMS2", "iCMS3")
     ) %>%
     ggplot(aes(x = Clusters, y = value, fill = iCMS)) +
