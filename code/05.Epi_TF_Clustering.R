@@ -840,7 +840,7 @@ sePeaks <- readRDS("../03.Epi_Molecular_Subtype/sePeaks.cluster.rds")
 Module.Mat.cluster <- sePeaks@colData %>%
     as.data.frame() %>%
     select(starts_with("Module.")) %>%
-    .[rownames(cluster.info), c(1,2,6,3,4,5)]
+    .[rownames(cluster.info), c(1, 2, 6, 3, 4, 5)]
 identical(rownames(Module.Mat.cluster), rownames(cluster.info))
 
 cluster.info <- cbind(cluster.info, Module.Mat.cluster)
@@ -994,7 +994,7 @@ homer.res.ad <- list(
     x <- x %>%
         filter(Diff == "up") %>%
         pull(TF) %>%
-        paste(.,"_",sep = "") %>%
+        paste(., "_", sep = "") %>%
         paste(collapse = "|")
 })
 

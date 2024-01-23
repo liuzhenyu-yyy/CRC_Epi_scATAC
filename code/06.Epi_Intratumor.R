@@ -29,28 +29,201 @@ mycolor <- list(
 )
 
 # 1. identify ITH of COAD26----
-## 1.1 cross patient ----
+## 1.1. CNV of specific patient ----
+dir.create("CNV_raw")
+dir.create("CNV_qc")
+load("../01.All_scCNV/CRC_CNV.rda")
+
+patient.selected <- c("COAD12", "COAD17", "COAD24", "COAD30", "COAD32", "COAD33", "COAD35")
+scales::show_col(mycolor$tree)
+
+close.dev <- function() {
+    while (dev.cur() != 1) {
+        dev.off()
+    }
+}
+for (one in patient.selected) {
+    cell.selected <- sample.info.epi %>%
+        filter(Epi_type %in% c("Malignant")) %>%
+        filter(Patient == one) %>%
+        rownames()
+
+    anno.row <- sample.info.epi[cell.selected, ] %>%
+        select(c("Clusters"))
+
+    close.dev()
+    png(paste0("CNV_raw/Heatmap.CNV.ITH.", one, ".raw.png"), 1000, 750)
+    tree.all <- pheatmap::pheatmap(CNV.FC[cell.selected, ],
+        color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
+        border_color = FALSE,
+        cluster_rows = TRUE, cluster_cols = FALSE,
+        clustering_method = "ward.D2",
+        annotation_col = anno.col,
+        annotation_row = anno.row,
+        annotation_colors = c(anno.color, mycolor)[c(colnames(anno.row), "seqnames")],
+        annotation_legend = FALSE,
+        show_rownames = FALSE,
+        show_colnames = FALSE,
+        cutree_rows = 5,
+        gaps_col = which(!duplicated(anno.col$seqnames)) - 1
+    )
+    dev.off()
+
+    temp <- cutree(tree.all$tree_row, 5)
+    anno.row$tree <- factor(temp[rownames(anno.row)], levels = 1:5)
+
+    close.dev()
+    png(paste0("CNV_raw/Heatmap.CNV.ITH.", one, ".clustered.png"), 1000, 750)
+    pheatmap::pheatmap(CNV.FC[cell.selected, ],
+        color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
+        border_color = FALSE,
+        cluster_rows = TRUE, cluster_cols = FALSE,
+        clustering_method = "ward.D2",
+        annotation_col = anno.col,
+        annotation_row = anno.row,
+        annotation_colors = c(anno.color, mycolor)[c(colnames(anno.row), "seqnames")],
+        annotation_legend = FALSE,
+        show_rownames = FALSE,
+        show_colnames = FALSE,
+        cutree_rows = 5,
+        gaps_col = which(!duplicated(anno.col$seqnames)) - 1
+    )
+    dev.off()
+}
+
+cluster.remove <- list(
+    "COAD12" = c(1, 5),
+    "COAD17" = c(3:5),
+    "COAD24" = c(3, 5),
+    "COAD30" = c(5),
+    "COAD32" = c(1),
+    "COAD33" = c(4, 5),
+    "COAD35" = c(1:3)
+)
+ncluster <- c(
+    "COAD12" = 2,
+    "COAD17" = 2,
+    "COAD24" = 2,
+    "COAD30" = 4,
+    "COAD32" = 5,
+    "COAD33" = 4,
+    "COAD35" = 3
+)
+dir.create("CNV_qc")
+for (one in patient.selected) {
+    cell.selected <- sample.info.epi %>%
+        filter(Epi_type %in% c("Malignant")) %>%
+        filter(Patient == one) %>%
+        rownames()
+
+    anno.row <- sample.info.epi[cell.selected, ] %>%
+        select(c("Clusters"))
+
+    close.dev()
+    png(paste0("CNV_qc/Heatmap.CNV.ITH.", one, ".raw.png"), 1000, 750)
+    tree.all <- pheatmap::pheatmap(CNV.FC[cell.selected, ],
+        color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
+        border_color = FALSE,
+        cluster_rows = TRUE, cluster_cols = FALSE,
+        clustering_method = "ward.D2",
+        annotation_col = anno.col,
+        annotation_row = anno.row,
+        annotation_colors = c(anno.color, mycolor)[c(colnames(anno.row), "seqnames")],
+        annotation_legend = FALSE,
+        show_rownames = FALSE,
+        show_colnames = FALSE,
+        cutree_rows = 5,
+        gaps_col = which(!duplicated(anno.col$seqnames)) - 1
+    )
+    dev.off()
+
+    temp <- cutree(tree.all$tree_row, 5)
+    anno.row$tree <- factor(temp[rownames(anno.row)], levels = 1:5)
+    cell.selected <- cell.selected[!anno.row[cell.selected, ]$tree %in% cluster.remove[[one]]]
+
+    close.dev()
+    png(paste0("CNV_qc/Heatmap.CNV.ITH.", one, ".qc.png"), 1000, 750)
+    tree.all <- pheatmap::pheatmap(CNV.FC[cell.selected, ],
+        color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
+        border_color = FALSE,
+        cluster_rows = TRUE, cluster_cols = FALSE,
+        clustering_method = "ward.D2",
+        annotation_col = anno.col,
+        annotation_row = anno.row,
+        annotation_colors = c(anno.color, mycolor)[c(colnames(anno.row), "seqnames")],
+        annotation_legend = FALSE,
+        show_rownames = FALSE,
+        show_colnames = FALSE,
+        cutree_rows = ncluster[one],
+        gaps_col = which(!duplicated(anno.col$seqnames)) - 1
+    )
+    dev.off()
+
+    temp <- cutree(tree.all$tree_row, ncluster[one])
+    anno.row$tree <- factor(temp[rownames(anno.row)], levels = 1:ncluster[one])
+
+    close.dev()
+    png(paste0("CNV_qc/Heatmap.CNV.ITH.", one, ".qc.png"), 1000, 750)
+    pheatmap::pheatmap(CNV.FC[cell.selected, ],
+        color = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100),
+        border_color = FALSE,
+        cluster_rows = TRUE, cluster_cols = FALSE,
+        clustering_method = "ward.D2",
+        annotation_col = anno.col,
+        annotation_row = anno.row,
+        annotation_colors = c(anno.color, mycolor)[c(colnames(anno.row), "seqnames")],
+        annotation_legend = FALSE,
+        show_rownames = FALSE,
+        show_colnames = FALSE,
+        cutree_rows = ncluster[one],
+        gaps_col = which(!duplicated(anno.col$seqnames)) - 1
+    )
+    dev.off()
+}
+
+## 1.2 cross patient ----
 plot.data <- sample.info.epi %>%
-    filter(Epi_type == "Malignant")
+    filter(Epi_type == "Malignant") %>%
+    filter(Patient %in% patient.selected)
+
 plot.data <- table(plot.data$Clusters, plot.data$Patient) %>%
     as.data.frame()
 colnames(plot.data) <- c("Clusters", "Patient", "Freq")
+plot.data$iCMS <- ifelse(plot.data$Patient %in% c("COAD30", "COAD35"), "iCMS3", "iCMS2")
 
-pdf("Bar.Pct.Patient.Cluster.pdf", 6, 3)
-ggplot(plot.data, aes(x = Patient, y = Freq, fill = Clusters)) +
-    geom_bar(stat = "identity", position = "fill") +
-    theme_bw() +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
-    labs(x = "Patient", y = "Fraction of cells", fill = "Patient") +
-    scale_fill_manual(values = ArchR::paletteDiscrete(proj_Epi$Clusters))
+pdf("Bar.Pct.Patient.Cluster.pdf", 4, 3)
 ggplot(plot.data, aes(x = Patient, y = Freq, fill = Clusters)) +
     geom_bar(stat = "identity") +
-    theme_bw() +
+    theme_classic() +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
-    labs(x = "Patient", y = "Fraction of cells", fill = "Patient") +
+    labs(x = "Patient", y = "Number of cells", fill = "Patient") +
+    facet_grid(cols = vars(iCMS), scales = "free", space = "free") +
     scale_fill_manual(values = ArchR::paletteDiscrete(proj_Epi$Clusters))
 dev.off()
+
+plot.data <- as.data.frame(ncluster) %>%
+    mutate(Patient = rownames(.)) %>%
+    mutate(iCMS = ifelse(Patient %in% c("COAD30", "COAD35"), "iCMS3", "iCMS2"))
+pdf("Bar.Pct.Patient.nSubclone.pdf", 4, 3)
+ggplot(plot.data, aes(x = Patient, y = ncluster, fill = Patient)) +
+    geom_bar(stat = "identity") +
+    facet_grid(cols = vars(iCMS), scales = "free", space = "free") +
+    theme_classic() +
+    ylab("No. of subclones") +
+    scale_fill_manual(values = ArchR::paletteDiscrete(proj_Epi$Patient))
+dev.off()
+
 rm(plot.data)
+
+events.list <- list(
+    "COAD12" = c("9p", "9q"),
+    "COAD17" = c("10p", "10q"),
+    "COAD24" = c("10p", "10q"),
+    "COAD30" = c("2p", "7p", "7q", "18", "20", "21"),
+    "COAD32" = c(),
+    "COAD33" = c("3q", "4", "5", "7"),
+    "COAD35" = c("7", "20", "21")
+)
 
 # 2. copy-number phylogenies ----
 ## 2.1. all cells ----
@@ -173,8 +346,10 @@ wilcox.test(
     sample.info.ITH[sample.info.ITH$Clusters == "C22", ]$Module.iCMS2
 )$p.value
 
-pdf("Violin.Module.iCMS2.pdf", 4, 3)
-ggplot(sample.info.ITH, aes(x = Subclone, y = Module.iCMS2)) +
+pdf("Violin.Module.iCMS2.pdf", 5, 3)
+ggplot(sample.info.ITH, aes(x = Module.iCMS2, y = factor(Subclone,
+    levels = rev(c("subclone_2", "subclone_1", "subclone_3", "subclone_5", "subclone_4"))
+))) +
     geom_violin(aes(fill = Subclone)) +
     theme_bw() +
     # ggpubr::stat_compare_means(
@@ -186,8 +361,8 @@ ggplot(sample.info.ITH, aes(x = Subclone, y = Module.iCMS2)) +
     #     ), label = "p.signif"
     # ) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-    facet_grid(cols = vars(Clusters), scales = "free_x", space = "free") +
-    labs(x = "Subclone", y = "Module.iCMS2") +
+    facet_grid(rows = vars(Clusters), scales = "free", space = "free") +
+    labs(x = "Module.iCMS2", y = "Subclone") +
     ggtitle("Inter-cluster  p-value < 2.2e-16") +
     scale_fill_manual(values = mycolor$Subclone)
 dev.off()
@@ -370,11 +545,12 @@ marker.subclone <- getMarkerFeatures(
     groupBy = "Subclone",
     testMethod = "wilcoxon",
     bias = c("TSSEnrichment", "log10(nFrags)"),
-    useGroups = c("subclone_1", "subclone_2", "subclone_3", "subclone_4", "subclone_5"),
+    useGroups = c("subclone_2", "subclone_1", "subclone_3", "subclone_5", "subclone_4"),
     bgdGroups = c("Normal")
 )
 
 saveRDS(marker.subclone, "markersPeaks.subclone.rds")
+marker.subclone <- readRDS("markersPeaks.subclone.rds")
 # markersPeaks.CIMP <- readRDS("markersPeaks.CIMP.rds")
 
 # volcano plot

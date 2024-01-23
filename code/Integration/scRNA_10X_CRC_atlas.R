@@ -173,7 +173,7 @@ ggplot(marker.10X, aes(x = avg_log2FC, y = -log10(p_val_adj), color = DEG)) +
     geom_vline(xintercept = c(-0.2, 0.2), linetype = "dashed") +
     # ylim(c(0, 200)) +
     xlim(c(-4, 4)) +
-    scale_color_manual(values = c("red", "gray", "blue")) +
+    scale_color_manual(values = c("blue", "gray", "red")) +
     theme_classic() +
     xlab("Log2 fold change") +
     ylab("-log10 adjusted p-value")
@@ -415,7 +415,7 @@ ggplot(marker.TCGA, aes(x = log2fc, y = -log10(p_adj), color = DEG)) +
     geom_hline(yintercept = -log10(0.05), linetype = "dashed") +
     geom_vline(xintercept = c(-0.2, 0.2), linetype = "dashed") +
     ylim(c(0, 200)) +
-    scale_color_manual(values = c("red", "gray", "blue")) +
+    scale_color_manual(values = c("blue", "gray", "red")) +
     theme_classic() +
     xlab("Log2 fold change") +
     ylab("-log10 adjusted p-value")
