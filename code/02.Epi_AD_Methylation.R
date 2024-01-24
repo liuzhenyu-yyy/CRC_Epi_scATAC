@@ -193,6 +193,59 @@ ggplot(homer.res.ad$Down, aes(x = Log2_Enrichment, y = log.p.value)) +
     theme_classic()
 dev.off()
 
+## 1.5. serrated vs conventional adenoma ----
+ad.markers <- list(
+    "Serrated" = c(
+        "ALDOB", "MUC5AC", "AQP5", "TACSTD2", "FSCN1", "TFF2", "ANXA10", "REG4",
+        "MUC17", "S100P", "GSDMB", "GSDMD", "IL18", "MKD", "RARA", "RXRA", "AGRN"
+    ),
+    "Conventional" = c(
+        "CLDN2", "CD44", "AXIN2", "RNF43", "TGFBI", "EPHB2", "TEAD2", "CDX2", "LGR5", "ASCL2"
+    )
+)
+proj_Epi$Sample_Type <- paste(proj_Epi$Sample, proj_Epi$Epi_type, sep = "_")
+selected <- table(proj_Epi$Sample_Type)
+selected <- names(selected)[selected > 10]
+selected <- setdiff(selected, "COAD09_Adenoma") %>%
+    grep("Adenoma", ., value = TRUE)
+
+p.list <- plotGroups(proj_Epi,
+    groupBy = "Sample_Type",
+    colorBy = "GeneScoreMatrix",
+    name = unlist(ad.markers) %>% intersect(getFeatures(proj_Epi)),
+    plotAs = "violin"
+)
+length(p.list)
+
+patient.rename <- c("P04", "P11", "P12", "P13", "P19", "P20", "P28")
+names(patient.rename) <- c("COAD06", "COAD16", "COAD17", "COAD18", "COAD24", "COAD25", "COAD34")
+
+p.list.2 <- lapply(p.list, function(x) {
+    temp <- x$data %>%
+        filter(x %in% selected) %>%
+        mutate(Patient = gsub("-nofacs|_Adenoma", "", x)) %>%
+        mutate("Type" = ifelse(Patient == ("COAD16"), "Serrated", "Conventional"))
+    temp$Patient <- patient.rename[temp$Patient]
+    p <- ggplot(temp) +
+        geom_violin(aes(x = Patient, y = y, fill = Type), alpha = 0.5, show.legend = FALSE) +
+        facet_grid(cols = vars(Type), scales = "free_x", space = "free_x") +
+        ylab("Gene acvitiy") +
+        theme_classic()
+    return(p)
+})
+
+for (one in names(p.list.2)) {
+    p.list.2[[one]] <- p.list.2[[one]] + ggtitle(one)
+}
+
+pdf("violin.AD.Serrated.markers.pdf", 21, 12)
+patchwork::wrap_plots(p.list.2, ncol = 7)
+dev.off()
+
+pdf("violin.AD.Serrated.markers.selected.pdf", 10, 5)
+patchwork::wrap_plots(p.list.2[c("MUC5AC", "TFF2", "AGRN", "RARA", "CLDN2", "LGR5", "ASCL2", "CD44")], ncol = 4)
+dev.off()
+
 # 2. AD diff peak keep in cancer ----
 ## 2.1. overlap with cancer peaks & CGI ----
 v <- Venn(list(
