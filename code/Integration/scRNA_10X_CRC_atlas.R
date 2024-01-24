@@ -186,7 +186,7 @@ marker.10X.list <- list(
 
 table(epi.obj$Class, epi.obj$Patient)
 
-## 2.3. marker my patient ----
+## 2.3. known iCMS signature ----
 epi.obj$iCMS <- "none"
 epi.obj$iCMS[grep("CMS1", epi.obj$Cell_subtype)] <- "iCMS3"
 epi.obj$iCMS[grep("CMS2", epi.obj$Cell_subtype)] <- "iCMS2"
@@ -198,93 +198,12 @@ epi.obj$Patient_Tumor <- epi.obj$Patient
 epi.obj$Patient_Tumor[epi.obj$Class == "Normal"] <- "Normal"
 table(epi.obj$Patient_Tumor)
 
-patients <- unique(epi.obj$Patient_Tumor) %>% setdiff("Normal")
-
-marker.10x.patient.up <- list()
-marker.10x.patient.down <- list()
-
-for (one in patients) {
-    message(Sys.time(), ": Find markers for ", one, "...")
-    temp <- FindMarkers(
-        epi.obj,
-        group.by = "Patient_Tumor",
-        ident.1 = one,
-        ident.2 = "Normal"
-    )
-    marker.10x.patient.up[[one]] <- rownames(temp)[temp$avg_log2FC > 0.25 & temp$p_val_adj < 0.05]
-    marker.10x.patient.down[[one]] <- rownames(temp)[temp$avg_log2FC < (-0.25) & temp$p_val_adj < 0.05]
-}
-
-length(marker.10x.patient.up %>% unlist() %>% unique())
-table(marker.10X$DEG)
-
-temp <- table(epi.obj$Patient_Tumor, epi.obj$iCMS)
-temp2 <- colnames(temp)[apply(temp, 1, function(x) {
-    which.max(x)
-})]
-names(temp2) <- rownames(temp)
-temp2 <- sort(temp2)
-temp2 <- temp2[c(24, 1:23)]
-
-# patient heatmap
-gene.selected <- c(
-    unlist(marker.10x.patient.up[names(temp2[2:24])]),
-    unlist(marker.10x.patient.down[names(temp2[2:24])])
-) %>% unique()
-length(unlist(marker.10x.patient.up) %>% unique())
-length(unlist(marker.10x.patient.down) %>% unique())
-# gene.selected <- gene.selected[order(marker.10X[gene.selected, "avg_log2FC"], decreasing = TRUE)]
-
-plot.data <- AverageExpression(epi.obj,
-    features = gene.selected,
-    group.by = "Patient_Tumor"
-)
-plot.data <- plot.data$RNA %>% as.data.frame()
-identical(rownames(plot.data), gene.selected)
-
-anno.row <- data.frame(
-    row.names = gene.selected,
-    "Gene" = ifelse(gene.selected %in% unlist(marker.10x.patient.up), "up", "down")
-)
-table(anno.row$Gene)
-
-anno.col <- data.frame(
-    row.names = names(temp2),
-    "iCMS" = temp2
-)
-
-plot.data <- plot.data[rownames(anno.row), rownames(anno.col)]
-plot.data.nor <- apply(plot.data, 1, function(x) {
-    x <- (x - mean(x)) / sd(x)
-}) %>% t()
-plot.data.nor[plot.data.nor > 2] <- 2
-plot.data.nor[plot.data.nor < -2] <- -2
-png("NG_10X/Heatmap.DEG.patient.png", 600, 600)
-pheatmap::pheatmap(
-    plot.data.nor,
-    annotation_col = anno.col,
-    annotation_row = anno.row,
-    cluster_rows = FALSE,
-    cluster_cols = FALSE,
-    show_rownames = FALSE,
-    show_colnames = TRUE,
-    color = colorRampPalette(c("blue", "white", "red"))(100),
-    annotation_colors = list(
-        iCMS = c("Normal" = "#208a42", "iCMS2" = "#283891", "iCMS3" = "#62b7e6"),
-        Gene = c("up" = "#cd2525", "down" = "#1774cd")
-    )
-)
-dev.off()
-
-## 2.4. known iCMS signature ----
 markers.iCMS <- read.table("E:/LabWork/Project/CRC_NGS_ATAC/iCMS markers.txt",
     stringsAsFactors = FALSE,
     sep = "\t", header = TRUE
 )
 markers.iCMS <- base::as.list(markers.iCMS) %>% sapply(function(x) setdiff(x, ""))
 lapply(markers.iCMS, length)
-(308 + 74) / 5160 # 7.4%
-(279 + 54) / 1468 # 22.7%
 
 markers.iCMS <- lapply(markers.iCMS, function(x) intersect(x, rownames(epi.obj)))
 lapply(markers.iCMS, length)
@@ -306,6 +225,14 @@ anno.row <- data.frame(
 )
 table(anno.row$Gene)
 
+temp <- table(epi.obj$Patient_Tumor, epi.obj$iCMS)
+temp2 <- colnames(temp)[apply(temp, 1, function(x) {
+    which.max(x)
+})]
+names(temp2) <- rownames(temp)
+temp2 <- sort(temp2)
+temp2 <- temp2[c(24, 1:23)]
+
 anno.col <- data.frame(
     row.names = names(temp2),
     "iCMS" = temp2
@@ -317,7 +244,7 @@ plot.data.nor <- apply(plot.data, 1, function(x) {
 }) %>% t()
 plot.data.nor[plot.data.nor > 2] <- 2
 plot.data.nor[plot.data.nor < -2] <- -2
-png("NG_10X/Heatmap.iCMS.geme.patient.png", 600, 600)
+png("NG_10X/Heatmap.iCMS.module.patient.png", 600, 600)
 pheatmap::pheatmap(
     plot.data.nor,
     annotation_col = anno.col,
@@ -337,6 +264,130 @@ pheatmap::pheatmap(
 dev.off()
 
 length(markers.iCMS$iCMS2_Up) / length(unlist(marker.10x.patient.up) %>% unique())
+
+## 2.4. marker my patient ----
+(308 + 74) / 5160 # 7.4%
+(279 + 54) / 1468 # 22.7%
+
+patients <- unique(epi.obj$Patient_Tumor) %>% setdiff("Normal")
+
+marker.10x.patient.up <- list()
+marker.10x.patient.down <- list()
+for (one in patients) {
+    message(Sys.time(), ": Find markers for ", one, "...")
+    temp <- FindMarkers(
+        epi.obj,
+        group.by = "Patient_Tumor",
+        ident.1 = one,
+        ident.2 = "Normal"
+    )
+    marker.10x.patient.up[[one]] <- rownames(temp)[temp$avg_log2FC > 0.5 & temp$p_val_adj < 0.05]
+    marker.10x.patient.down[[one]] <- rownames(temp)[temp$avg_log2FC < (-0.5) & temp$p_val_adj < 0.05]
+}
+
+length(marker.10x.patient.up %>% unlist() %>% unique())
+table(marker.10X$DEG)
+
+# iCMS2 patient heatmap
+gene.selected <- c(
+    markers.iCMS$iCMS2_Up,
+    unlist(marker.10x.patient.up[names(temp2[temp2 == "iCMS2"])])
+) %>% unique()
+length(unlist(marker.10x.patient.up[names(temp2[temp2 == "iCMS2"])]) %>% unique())
+
+# gene.selected <- gene.selected[order(marker.10X[gene.selected, "avg_log2FC"], decreasing = TRUE)]
+
+plot.data <- AverageExpression(epi.obj,
+    features = gene.selected,
+    group.by = "Patient_Tumor"
+)
+plot.data <- plot.data$RNA %>% as.data.frame()
+identical(rownames(plot.data), gene.selected)
+
+anno.row <- data.frame(
+    row.names = gene.selected,
+    "Gene" = ifelse(gene.selected %in% markers.iCMS$iCMS2_Up, "consensus", "specific")
+)
+table(anno.row$Gene)
+
+anno.col <- data.frame(
+    row.names = names(temp2),
+    "iCMS" = temp2
+)
+
+plot.data <- plot.data[rownames(anno.row), rownames(anno.col)]
+plot.data.nor <- apply(plot.data, 1, function(x) {
+    x <- (x - mean(x)) / sd(x)
+})
+plot.data.nor[plot.data.nor > 1.5] <- 1.5
+plot.data.nor[plot.data.nor < -1.5] <- -1.5
+
+png("NG_10X/Heatmap.DEG.patient.iCMS2.png", 600, 300)
+pheatmap::pheatmap(
+    plot.data.nor,
+    annotation_col = anno.row,
+    annotation_row = anno.col,
+    cluster_rows = FALSE,
+    cluster_cols = FALSE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    color = ArchR::paletteContinuous("blueYellow"),
+    annotation_colors = list(
+        iCMS = c("Normal" = "#208a42", "iCMS2" = "#283891", "iCMS3" = "#62b7e6"),
+        Gene = c("consensus" = "#86d786", "specific" = "#f6be43")
+    )
+)
+dev.off()
+
+# iCMS3 patient heatmap
+gene.selected <- c(
+    markers.iCMS$iCMS3_Up,
+    unlist(marker.10x.patient.up[names(temp2[temp2 == "iCMS3"])])
+) %>% unique()
+length(unlist(marker.10x.patient.up[names(temp2[temp2 == "iCMS3"])]) %>% unique())
+
+plot.data <- AverageExpression(epi.obj,
+    features = gene.selected,
+    group.by = "Patient_Tumor"
+)
+plot.data <- plot.data$RNA %>% as.data.frame()
+identical(rownames(plot.data), gene.selected)
+
+anno.row <- data.frame(
+    row.names = gene.selected,
+    "Gene" = ifelse(gene.selected %in% markers.iCMS$iCMS3_Up, "consensus", "specific")
+)
+table(anno.row$Gene)
+
+anno.col <- data.frame(
+    row.names = names(temp2),
+    "iCMS" = temp2
+)
+
+plot.data <- plot.data[rownames(anno.row), rownames(anno.col)]
+plot.data.nor <- apply(plot.data, 1, function(x) {
+    x <- (x - mean(x)) / sd(x)
+})
+plot.data.nor[plot.data.nor > 1.5] <- 1.5
+plot.data.nor[plot.data.nor < -1.5] <- -1.5
+names(ArchR::ArchRPalettes)
+png("NG_10X/Heatmap.DEG.patient.iCMS3.png", 600, 300)
+pheatmap::pheatmap(
+    plot.data.nor,
+    annotation_col = anno.row,
+    annotation_row = anno.col,
+    cluster_rows = FALSE,
+    cluster_cols = FALSE,
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    color = ArchR::paletteContinuous("blueYellow"),
+    annotation_colors = list(
+        iCMS = c("Normal" = "#208a42", "iCMS2" = "#283891", "iCMS3" = "#62b7e6"),
+        Gene = c("consensus" = "#86d786", "specific" = "#f6be43")
+    )
+)
+dev.off()
+
 rm(plot.data, plot.data.nor, anno.row, anno.col, patients, one, temp, temp2)
 
 ## 2.5 expression of selected TFs ----
@@ -346,8 +397,9 @@ TF.selected <- c(
     "ETS1", "JUN", "LEF1", "TCF3", "NR4A1", "HNF1A", "CDX2", "PPARA", "NR2C2", "HNF4A"
 )
 
-epi.obj$iCMS
-p <- Seurat::DotPlot(epi.obj, features = TF.selected, group.by = "iCMS", scale = FALSE)
+table(epi.obj$iCMS)
+Idents(epi.obj) <- epi.obj$iCMS
+p <- Seurat::DotPlot(epi.obj, features = TF.selected, idents = c("Normal", "iCMS2", "iCMS3"), scale = TRUE)
 plot.data <- p$data
 
 plot.data.1 <- plot.data[plot.data$id == "iCMS2", ] %>%
@@ -356,12 +408,17 @@ plot.data.1 <- plot.data[plot.data$id == "iCMS2", ] %>%
 plot.data.2 <- plot.data[plot.data$id == "iCMS3", ] %>%
     .[TF.selected, ] %>%
     mutate(id = "iCMS3")
-plot.data <- rbind(plot.data.1, plot.data.2)
-plot.data$features.plot <- factor(c(TF.selected, TF.selected), levels = TF.selected)
-plot.data[plot.data$avg.exp > 4, ]$avg.exp <- 4
+plot.data.3 <- plot.data[plot.data$id == "Normal", ] %>%
+    .[TF.selected, ] %>%
+    mutate(id = "Normal")
 
-pdf("NG_10X/Dot.motif.sig.iCMS.selected.pdf", 2.5, 4)
-ggplot(plot.data, aes(x = id, y = features.plot, fill = avg.exp, size = pct.exp)) +
+plot.data <- rbind(plot.data.1, plot.data.2, plot.data.3)
+plot.data$features.plot <- factor(plot.data$features.plot, levels = TF.selected)
+plot.data[plot.data$avg.exp > 4, ]$avg.exp <- 4
+plot.data$id <- factor(plot.data$id, levels = c("Normal", "iCMS2", "iCMS3"))
+
+pdf("NG_10X/Dot.motif.sig.iCMS.selected.pdf", 3, 4)
+ggplot(plot.data, aes(x = id, y = features.plot, fill = avg.exp.scaled, size = pct.exp)) +
     geom_point(pch = 21) +
     theme_bw() +
     xlab("iCMS") +
