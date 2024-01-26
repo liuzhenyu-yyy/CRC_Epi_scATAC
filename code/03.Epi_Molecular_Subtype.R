@@ -1510,7 +1510,7 @@ homer.res.cluster <- do.call(rbind, homer.res.cluster)
 table(homer.res.cluster$Cluster)
 
 # iCMS TFs
-TF.selected <- c("HNF4A", "PPARA", "NUR77", "HNF1", "TR4", "SOX4", "SOX2", "MAFB", "MAFK", "FOXA2", "FOXA3")
+TF.selected <- c("HNF4A", "PPARA", "HNF1", "TR4", "CDX2", "SOX4", "SOX2", "MAFB", "MAFK", "FOXA2", "FOXA3")
 
 plot.data <- homer.res.cluster %>%
     filter(TF %in% TF.selected) %>%
@@ -1521,7 +1521,7 @@ plot.data <- homer.res.cluster %>%
     )
 
 plot.data$TF <- factor(plot.data$TF, levels = TF.selected)
-plot.data$Group <- ifelse(plot.data$TF %in% c("HNF4A", "PPARA", "NUR77", "HNF1", "TR4"), "iCMS2 TF", "iCMS3 TF")
+plot.data$Group <- ifelse(plot.data$TF %in% c("HNF4A", "PPARA", "CDX2", "HNF1", "TR4"), "iCMS2 TF", "iCMS3 TF")
 if (max(plot.data$log.p.value) > 500) {
     plot.data[plot.data$log.p.value > 500, ]$log.p.value <- 500
 }
@@ -1663,7 +1663,7 @@ for (one in cluster.selected) {
 pdf("Cluster_level/Heatmap.PPARA.clusterPeaks.pdf", 10, 6)
 p <- pheatmap(
     t(plot.data)[c(
-        "C2", "C16", "C13", "C12", "C14", "C22", "C18", "C23", 
+        "C2", "C16", "C13", "C12", "C14", "C22", "C18", "C23",
         "C15", "C19", "C17", "C20", "C21", "C7", "C8"
     ), ],
     scale = "none",
