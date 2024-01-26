@@ -110,6 +110,7 @@ ncluster <- c(
     "COAD35" = 3
 )
 dir.create("CNV_qc")
+subclone.list <- list()
 for (one in patient.selected) {
     cell.selected <- sample.info.epi %>%
         filter(Epi_type %in% c("Malignant")) %>%
@@ -140,6 +141,7 @@ for (one in patient.selected) {
     temp <- cutree(tree.all$tree_row, 5)
     anno.row$tree <- factor(temp[rownames(anno.row)], levels = 1:5)
     cell.selected <- cell.selected[!anno.row[cell.selected, ]$tree %in% cluster.remove[[one]]]
+    anno.row <- anno.row[rownames(anno.row) %in% cell.selected, ]
 
     close.dev()
     png(paste0("CNV_qc/Heatmap.CNV.ITH.", one, ".qc.png"), 1000, 750)
@@ -162,6 +164,9 @@ for (one in patient.selected) {
     temp <- cutree(tree.all$tree_row, ncluster[one])
     anno.row$tree <- factor(temp[rownames(anno.row)], levels = 1:ncluster[one])
 
+    subclone.list[[one]] <- split(rownames(anno.row), anno.row$tree)
+    names(subclone.list[[one]]) <- paste("subclone_", 1:ncluster[one], sep = "")
+
     close.dev()
     png(paste0("CNV_qc/Heatmap.CNV.ITH.", one, ".qc.png"), 1000, 750)
     pheatmap::pheatmap(CNV.FC[cell.selected, ],
@@ -180,8 +185,9 @@ for (one in patient.selected) {
     )
     dev.off()
 }
+saveRDS(subclone.list, "subclone.list.rds")
 
-## 1.2 cross patient ----
+## 1.2. cross patient ----
 plot.data <- sample.info.epi %>%
     filter(Epi_type == "Malignant") %>%
     filter(Patient %in% patient.selected)
@@ -773,6 +779,95 @@ plotFootprints(
     pal = c(mycolor$Subclone),
     smoothWindow = 10
 )
+
+# 4. Validate in other patients ----
+subclone.list <- readRDS("subclone.list.rds")
+sample.info.epi$Subclone_all <- "None"
+
+for (patient in names(subclone.list)) {
+    for (subclone in names(subclone.list[[patient]])) {
+        sample.info.epi[rownames(sample.info.epi) %in%
+            subclone.list[[patient]][[subclone]], ]$Subclone_all <- paste(patient, subclone, sep = "_")
+    }
+}
+table(sample.info.epi$Subclone_all)
+
+proj_Epi$Subclone_all <- sample.info.epi$Subclone_all
+colnames(sample.info.epi)
+
+# iCMS modules
+p <- plotGroups(
+    ArchRProj = proj_Epi,
+    groupBy = "Subclone_all",
+    colorBy = "cellColdata",
+    name = "Module.iCMS2",
+    plotAs = "violin",
+)
+plot.data <- p$data
+colnames(plot.data) <- c("Subclone_all", "Module.iCMS2")
+plot.data <- plot.data %>%
+    mutate(Patient = gsub("_.*", "", Subclone_all),
+    Subclone = gsub("^.+?_", "", Subclone_all)) %>%
+    filter(Patient %in% c("COAD12", "COAD17", "COAD24", "COAD33"))
+
+pdf("Violin.all.Module.iCMS2.pdf", 5, 3)
+ggplot(plot.data, aes(x = Subclone, y = Module.iCMS2, fill = Subclone)) +
+    geom_violin() +
+    ggpubr::stat_compare_means(
+        comparisons = list(
+            c("subclone_1", "subclone_2")
+        ), size = 2
+    ) +
+    facet_grid(cols = vars(Patient), scales = "free", space = "free") +
+    theme_classic()
+dev.off()
+
+# TF activity
+p <- plotGroups(
+    ArchRProj = proj_Epi,
+    groupBy = "Subclone_all",
+    colorBy = "MotifMatrix",
+    name = TF.selected.name[5:6],
+    plotAs = "violin",
+)
+
+plot.data <- p[[1]]$data
+colnames(plot.data) <- c("Subclone_all", "Activity")
+plot.data <- plot.data %>%
+    mutate(Patient = gsub("_.*", "", Subclone_all),
+    Subclone = gsub("^.+?_", "", Subclone_all)) %>%
+    filter(Patient %in% c("COAD12", "COAD17", "COAD24", "COAD33"))
+
+pdf("Violin.all.PPARA.pdf", 5, 3)
+ggplot(plot.data, aes(x = Subclone, y = Activity, fill = Subclone)) +
+    geom_violin() +
+    ggpubr::stat_compare_means(
+        comparisons = list(
+            c("subclone_1", "subclone_2")
+        ), size = 2
+    ) +
+    facet_grid(cols = vars(Patient), scales = "free", space = "free") +
+    theme_classic()
+dev.off()
+
+plot.data <- p[[2]]$data
+colnames(plot.data) <- c("Subclone_all", "Activity")
+plot.data <- plot.data %>%
+    mutate(Patient = gsub("_.*", "", Subclone_all),
+    Subclone = gsub("^.+?_", "", Subclone_all)) %>%
+    filter(Patient %in% c("COAD12", "COAD17", "COAD24", "COAD33"))
+
+pdf("Violin.all.HNF4A.pdf", 5, 3)
+ggplot(plot.data, aes(x = Subclone, y = Activity, fill = Subclone)) +
+    geom_violin() +
+    ggpubr::stat_compare_means(
+        comparisons = list(
+            c("subclone_1", "subclone_2")
+        ), size = 2
+    ) +
+    facet_grid(cols = vars(Patient), scales = "free", space = "free") +
+    theme_classic()
+dev.off()
 
 
 gc()
