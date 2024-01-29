@@ -445,10 +445,10 @@ ggplot(plot.data, aes(x = Module.iCMS2, y = Module.iCMS3)) +
 dev.off()
 
 plot.data <- sample.info.epi %>%
-    filter(Epi_type == "Malignant") %>%
+    filter(Epi_type != "Adenoma") %>%
     select(matches("Module|Group"))
 
-pdf("Dot.Module.iCMS.cells.pdf", 5, 3.7)
+pdf("Dot.Module.iCMS.cells2.pdf", 5, 3.7)
 ggplot(plot.data, aes(x = Module.iCMS2, y = Module.iCMS3)) +
     geom_point(aes(color = Epi_Group), size = 0.6) +
     stat_ellipse(aes(group = Epi_Group), level = 0.9) +
@@ -460,16 +460,21 @@ ggplot(plot.data, aes(x = Module.iCMS2, y = Module.iCMS3)) +
 dev.off()
 
 plot.data <- melt(plot.data[, c("Epi_Group", "Module.iCMS3", "Module.iCMS2")], id.vars = c("Epi_Group"))
-plot.data$Epi_Group <- factor(plot.data$Epi_Group, levels = c("Group_2", "Group_1"))
-pdf("Box.Module.iCMS.pdf", 4.5, 3.5)
+plot.data$Epi_Group <- factor(plot.data$Epi_Group, levels = c("Normal", "Group_2", "Group_1"))
+plot.data$variable <- factor(plot.data$variable, levels = c("Module.iCMS2", "Module.iCMS3"))
+
+pdf("Violin.Module.iCMS.pdf", 4.5, 3.5)
 ggplot(plot.data, aes(x = Epi_Group, y = value)) +
     geom_violin(aes(fill = Epi_Group),
-        show.legend = FALSE, size = 0.2
+        show.legend = FALSE, size = 0.5
     ) +
     scale_fill_manual(values = mycolor$Epi_Group) +
-        ggpubr::stat_compare_means(comparisons = list(c("Group_1", "Group_2"))) +
-        facet_wrap(~variable, scales = "free_y") +
-        ylab("Module Score") +
+    ggpubr::stat_compare_means(comparisons = list(
+        c("Group_1", "Group_2"), c("Normal", "Group_2"),
+        c("Group_1", "Normal")
+    )) +
+    facet_wrap(~variable, scales = "free_y") +
+    ylab("Module Score") +
     theme_classic()
 dev.off()
 
@@ -1120,8 +1125,8 @@ plot.data$Label[!plot.data$TF %in% TF.selected] <- NA
 plot.data$m_log10_FDR <- -log10(plot.data$FDR)
 plot.data$m_log10_FDR[plot.data$m_log10_FDR > 50] <- 50
 
-pdf("TF_motif/Scatter.TF.GS.deviation.pdf", 8, 4)
-ggplot(plot.data, aes(x = motif.diff, y = gene.diff)) +
+pdf("TF_motif/Scatter.TF.GS.deviation.pdf", 8, 3.7)
+ggplot(plot.data, aes(x = gene.diff, y = motif.diff)) +
     geom_point(aes(color = m_log10_FDR)) +
     ggrepel::geom_text_repel(aes(label = Label), size = 2.5, max.overlaps = 50) +
     facet_wrap(~iCMS, ncol = 2, scales = "free") +
@@ -1129,8 +1134,8 @@ ggplot(plot.data, aes(x = motif.diff, y = gene.diff)) +
     theme_bw()
 dev.off()
 
-pdf("TF_motif/Scatter.TF.GS.deviation.all.pdf", 8, 4)
-ggplot(plot.data, aes(x = motif.diff, y = gene.diff)) +
+pdf("TF_motif/Scatter.TF.GS.deviation.all.pdf", 8, 3.7)
+ggplot(plot.data, aes(x = gene.diff, y = motif.diff)) +
     geom_point(aes(color = m_log10_FDR)) +
     ggrepel::geom_text_repel(aes(label = TF), size = 2.5, max.overlaps = 15) +
     facet_wrap(~iCMS, ncol = 2, scales = "free") +
@@ -1396,34 +1401,67 @@ cluster.info %>%
 dev.off()
 
 ## 6.2 compare cluster peaks ----
-plot.data <- matrix(0, nrow = length(peaks.clusters.up), ncol = length(peaks.clusters.up))
-rownames(plot.data) <- colnames(plot.data) <- rownames(cluster.info)
-
 Jaccard_Sim <- function(x, y) {
     x <- unique(x)
     y <- unique(y)
     return(length(intersect(x, y)) / length(union(x, y)))
 }
 
+cluster.info2 <- readRDS("../04.Epi_CIMP/cluster.info.rds")
+identical(rownames(cluster.info), rownames(cluster.info2))
+diag(plot.data) <- NA
+anno.col <- cluster.info %>%
+    select(c("iCMS")) %>%
+    mutate("CIMP_Group" = cluster.info2$CIMP_Group)
+rm(cluster.info2)
+
+colnames(anno.col) <- names(mycolor)[c(1:4)]
+mycolor$iCMS <- c("iCMS2" = "#283891", "iCMS3" = "#62b7e6")
+mycolor$CIMP_Group <- c("CIMP_High" = "#f76960", "CIMP_Low" = "#fbe625", "CIMP_Negative" = "#89dc0e")
+
+plot.data <- matrix(0, nrow = length(peaks.clusters.up), ncol = length(peaks.clusters.up))
+rownames(plot.data) <- colnames(plot.data) <- rownames(cluster.info)
+
 for (i in seq_len(length(peaks.clusters.up))) {
     for (j in seq_len(length(peaks.clusters.up))) {
         plot.data[i, j] <- Jaccard_Sim(peaks.clusters.up[[i]], peaks.clusters.up[[j]])
     }
 }
-
 diag(plot.data) <- NA
-anno.col <- cluster.info %>%
-    select(c("iCMS"))
-colnames(anno.col) <- names(mycolor)[c(1:4)]
-mycolor$iCMS <- c("iCMS2" = "#283891", "iCMS3" = "#62b7e6")
 
-pdf("Cluster_level/Heatmap.Jaccard.peak.up.pdf", 5, 4)
-pheatmap(plot.data[order(anno.col$iCMS), order(anno.col$iCMS)],
+rownames(plot.data) <- colnames(plot.data) <- cluster.rename[colnames(plot.data), ]$manual
+rownames(anno.col) <- cluster.rename[rownames(anno.col), ]$manual
+
+pdf("Cluster_level/Heatmap.Jaccard.peak.up.pdf", 7, 5)
+pheatmap::pheatmap(plot.data,
     annotation_col = anno.col,
     annotation_row = anno.col,
-    cluster_rows = FALSE, cluster_cols = FALSE,
+    cluster_rows = TRUE, cluster_cols = TRUE,
     annotation_colors = mycolor[colnames(anno.col)],
-    gaps_row = 15, gaps_col = 15,
+    cluster_method = "ward.D",
+    border_color = NA,
+)
+dev.off()
+
+plot.data <- matrix(0, nrow = length(peaks.clusters.up), ncol = length(peaks.clusters.up))
+rownames(plot.data) <- colnames(plot.data) <- rownames(cluster.info)
+
+for (i in seq_len(length(peaks.clusters.down))) {
+    for (j in seq_len(length(peaks.clusters.down))) {
+        plot.data[i, j] <- Jaccard_Sim(peaks.clusters.down[[i]], peaks.clusters.down[[j]])
+    }
+}
+diag(plot.data) <- NA
+
+rownames(plot.data) <- colnames(plot.data) <- cluster.rename[colnames(plot.data), ]$manual
+
+pdf("Cluster_level/Heatmap.Jaccard.peak.down.pdf", 7, 5)
+pheatmap::pheatmap(plot.data,
+    annotation_col = anno.col,
+    annotation_row = anno.col,
+    cluster_rows = TRUE, cluster_cols = TRUE,
+    annotation_colors = mycolor[colnames(anno.col)],
+    cluster_method = "ward.D",
     border_color = NA,
 )
 dev.off()

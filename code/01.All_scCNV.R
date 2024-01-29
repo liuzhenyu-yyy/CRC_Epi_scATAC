@@ -540,6 +540,44 @@ ggplot(nClusters %>% filter(resolutions <= 1.15), aes(x = resolutions)) +
     theme_classic()
 dev.off()
 
+## 4.5. barplot composition ----
+
+table(proj_Epi$location)
+proj_Epi$location_new <- gsub("LN", "C", proj_Epi$location)
+
+proj_Epi$Sample_2 <- gsub("-nofacs", "", proj_Epi$Sample)
+proj_Epi$Sample_2 <- rename.patient[proj_Epi$Sample_2]
+
+plot.data <- table(proj_Epi$location_new, proj_Epi$Epi_type, proj_Epi$Sample_2) %>%
+    as.data.frame() %>%
+    filter(Var1 == "C") %>%
+    mutate(Var1 = "Cancer")
+
+colnames(plot.data) <- c("Location", "Epi_type", "Patient", "Count")
+
+plot.data$Epi_type <- factor(plot.data$Epi_type,
+    levels = c("Normal", "Adenoma", "Malignant")
+)
+plot.data <- plot.data %>%
+    filter(Patient != "P20")
+
+pdf("Bar.Cancer.Cell_Type.pdf", 7, 3)
+ggplot() +
+    geom_bar(
+        data = plot.data, aes(x = Patient, y = Count, fill = Epi_type),
+        stat = "identity", width = 0.7, position = "fill"
+    ) +
+    scale_fill_manual(values = c(
+        "Normal" = "#208a42", "Adenoma" = "#d51f26", "Malignant" = "#272d6a"
+    )) +
+    facet_wrap(~Location) +
+    theme_classic() +
+    theme(
+        axis.text.x = element_text(angle = 45, hjust = 1)
+    ) +
+    ylab("Fraction of cells")
+dev.off()
+
 # 5. scCNV for Epi clusters ----
 load("CRC_CNV.rda")
 proj_Epi$Epi_type <- "Malignant"

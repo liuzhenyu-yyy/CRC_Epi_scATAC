@@ -599,6 +599,9 @@ plot.data <- data.frame(
         return(sum(x %in% diff_peaks$AD_vs_NA$Down$peak_id))
     })
 )
+(plot.data$n_Up / plot.data$n_Down) %>% mean() # 2.474568
+(plot.data$n_Up > plot.data$n_Down) %>% sum() # 22
+
 plot.data$n_Up_Malignant <- plot.data$n_Up - plot.data$n_Up_Adenoma
 plot.data$n_Down_Malignant <- plot.data$n_Down - plot.data$n_Down_Adenoma
 plot.data$n_Up <- NULL
