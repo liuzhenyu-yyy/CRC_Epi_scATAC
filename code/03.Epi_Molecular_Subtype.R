@@ -1409,7 +1409,7 @@ Jaccard_Sim <- function(x, y) {
 
 cluster.info2 <- readRDS("../04.Epi_CIMP/cluster.info.rds")
 identical(rownames(cluster.info), rownames(cluster.info2))
-diag(plot.data) <- NA
+
 anno.col <- cluster.info %>%
     select(c("iCMS")) %>%
     mutate("CIMP_Group" = cluster.info2$CIMP_Group)
@@ -1421,6 +1421,7 @@ mycolor$CIMP_Group <- c("CIMP_High" = "#f76960", "CIMP_Low" = "#fbe625", "CIMP_N
 
 plot.data <- matrix(0, nrow = length(peaks.clusters.up), ncol = length(peaks.clusters.up))
 rownames(plot.data) <- colnames(plot.data) <- rownames(cluster.info)
+diag(plot.data) <- NA
 
 for (i in seq_len(length(peaks.clusters.up))) {
     for (j in seq_len(length(peaks.clusters.up))) {

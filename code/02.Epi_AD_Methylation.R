@@ -1079,6 +1079,56 @@ for (one in patient.selected[2:6]) {
 }
 rm(v, one)
 
+# fraction of patient
+Pct_AD_Frac <- function(x, y) {
+    x <- unique(x)
+    y <- unique(y)
+    return(length(intersect(x, y)) / length(x))
+}
+Pct_Ca_Frac <- function(x, y) {
+    x <- unique(x)
+    y <- unique(y)
+    return(length(intersect(x, y)) / length(y))
+}
+Jaccard_Sim <- function(x, y) {
+    x <- unique(x)
+    y <- unique(y)
+    return(length(intersect(x, y)) / length(union(x, y)))
+}
+
+plot.data <- matrix(0, nrow = length(diff_peaks_patient_AD), ncol = length(diff_peaks_patient_Ca))
+rownames(plot.data) <- colnames(plot.data) <- names(diff_peaks_patient_AD)
+
+for (i in seq_len(length(diff_peaks_patient_AD))) {
+    for (j in seq_len(length(diff_peaks_patient_Ca))) {
+        plot.data[i, j] <- Jaccard_Sim(diff_peaks_patient_AD[[i]]$Up, diff_peaks_patient_Ca[[j]]$Up)
+    }
+}
+pdf("Paired_Sample/Heatmap.Jaccard.Ca.of.Ad.Up.pdf", 7, 5)
+pheatmap::pheatmap(plot.data[2:6, 2:6],
+    cluster_rows = FALSE, cluster_cols = FALSE,
+    annotation_row = data.frame(row.names = rownames(plot.data), "AD" = rep("Adnenoma", 6)),
+    annotation_col = data.frame(row.names = rownames(plot.data), "Ca" = rep("Malignant", 6)),
+    cluster_method = "ward.D",
+    border_color = NA,
+)
+dev.off()
+
+for (i in seq_len(length(diff_peaks_patient_AD))) {
+    for (j in seq_len(length(diff_peaks_patient_Ca))) {
+        plot.data[i, j] <- Pct_Ca_Frac(diff_peaks_patient_AD[[i]]$Down, diff_peaks_patient_Ca[[j]]$Down)
+    }
+}
+pdf("Paired_Sample/Heatmap.Frac.Ca.of.Ad.Down.pdf", 7, 5)
+pheatmap::pheatmap(plot.data[2:6, 2:6],
+    cluster_rows = FALSE, cluster_cols = FALSE,
+    annotation_row = data.frame(row.names = rownames(plot.data), "AD" = rep("Adnenoma", 6)),
+    annotation_col = data.frame(row.names = rownames(plot.data), "Ca" = rep("Malignant", 6)),
+    cluster_method = "ward.D",
+    border_color = NA,
+)
+dev.off()
+
 ## 4.4. heatmap of AD peaks by patient ----
 anno.col <- data.frame(
     row.names = colnames(peakmat.type.sample),
