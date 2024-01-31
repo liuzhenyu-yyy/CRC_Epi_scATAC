@@ -244,22 +244,23 @@ plot.data.nor <- apply(plot.data, 1, function(x) {
 }) %>% t()
 plot.data.nor[plot.data.nor > 2] <- 2
 plot.data.nor[plot.data.nor < -2] <- -2
-png("NG_10X/Heatmap.iCMS.module.patient.png", 600, 600)
+
+png("NG_10X/Heatmap.iCMS.module.patient.png", 600, 400)
 pheatmap::pheatmap(
-    plot.data.nor,
-    annotation_col = anno.col,
-    annotation_row = anno.row,
+    t(plot.data.nor),
+    annotation_col = anno.row,
+    annotation_row = anno.col,
     cluster_rows = FALSE,
     cluster_cols = FALSE,
-    show_rownames = FALSE,
-    show_colnames = TRUE,
-    color = colorRampPalette(c("blue", "white", "red"))(100),
+    show_rownames = TRUE,
+    show_colnames = FALSE,
+    color = ArchR::paletteContinuous("blueYellow"),
     annotation_colors = list(
         iCMS = c("Normal" = "#208a42", "iCMS2" = "#283891", "iCMS3" = "#62b7e6"),
         Gene = c("iCMS2_Up" = "#c80505", "iCMS2_Down" = "#064e91",  "iCMS3_Up" = "#DC7C7C", "iCMS3_Down" = "#66aced")
     ),
-    gaps_row = sum(length(markers.iCMS$iCMS2_Up), length(markers.iCMS$iCMS2_Down)),
-    gaps_col = c(1, 15)
+     gaps_col= sum(length(markers.iCMS$iCMS2_Up), length(markers.iCMS$iCMS2_Down)),
+     gaps_row = c(1, 15)
 )
 dev.off()
 
@@ -290,12 +291,10 @@ table(marker.10X$DEG)
 
 # iCMS2 patient heatmap
 gene.selected <- c(
-    markers.iCMS$iCMS2_Up,
+    #markers.iCMS$iCMS2_Up,
     unlist(marker.10x.patient.up[names(temp2[temp2 == "iCMS2"])])
 ) %>% unique()
-length(unlist(marker.10x.patient.up[names(temp2[temp2 == "iCMS2"])]) %>% unique())
-
-# gene.selected <- gene.selected[order(marker.10X[gene.selected, "avg_log2FC"], decreasing = TRUE)]
+length(unlist(marker.10x.patient.up[names(temp2[temp2 == "iCMS2"])]) %>% unique()) # 4052
 
 plot.data <- AverageExpression(epi.obj,
     features = gene.selected,
@@ -304,11 +303,16 @@ plot.data <- AverageExpression(epi.obj,
 plot.data <- plot.data$RNA %>% as.data.frame()
 identical(rownames(plot.data), gene.selected)
 
+table(temp2)
 anno.row <- data.frame(
     row.names = gene.selected,
-    "Gene" = ifelse(gene.selected %in% markers.iCMS$iCMS2_Up, "consensus", "specific")
+    "Gene" = ifelse(table(marker.10x.patient.up[names(temp2[temp2 == "iCMS2"])] %>%
+        unlist())[gene.selected] >= 14 * 0.6, "consensus", "specific")
 )
 table(anno.row$Gene)
+anno.row <- rbind(anno.row %>% filter(Gene == "consensus") %>% arrange(rnorm(nrow(.))),
+    anno.row %>% filter(Gene == "specific")
+)
 
 anno.col <- data.frame(
     row.names = names(temp2),
@@ -324,7 +328,7 @@ plot.data.nor[plot.data.nor < -1.5] <- -1.5
 
 png("NG_10X/Heatmap.DEG.patient.iCMS2.png", 600, 300)
 pheatmap::pheatmap(
-    plot.data.nor,
+    plot.data.nor[anno.col$iCMS != "iCMS3", ],
     annotation_col = anno.row,
     annotation_row = anno.col,
     cluster_rows = FALSE,
@@ -335,16 +339,17 @@ pheatmap::pheatmap(
     annotation_colors = list(
         iCMS = c("Normal" = "#208a42", "iCMS2" = "#283891", "iCMS3" = "#62b7e6"),
         Gene = c("consensus" = "#86d786", "specific" = "#f6be43")
-    )
+    ),
+    gaps_col = 539
 )
 dev.off()
 
 # iCMS3 patient heatmap
 gene.selected <- c(
-    markers.iCMS$iCMS3_Up,
+    # markers.iCMS$iCMS3_Up,
     unlist(marker.10x.patient.up[names(temp2[temp2 == "iCMS3"])])
 ) %>% unique()
-length(unlist(marker.10x.patient.up[names(temp2[temp2 == "iCMS3"])]) %>% unique())
+length(unlist(marker.10x.patient.up[names(temp2[temp2 == "iCMS3"])]) %>% unique()) # 3845
 
 plot.data <- AverageExpression(epi.obj,
     features = gene.selected,
@@ -353,11 +358,17 @@ plot.data <- AverageExpression(epi.obj,
 plot.data <- plot.data$RNA %>% as.data.frame()
 identical(rownames(plot.data), gene.selected)
 
+table(temp2)
 anno.row <- data.frame(
     row.names = gene.selected,
-    "Gene" = ifelse(gene.selected %in% markers.iCMS$iCMS3_Up, "consensus", "specific")
+    "Gene" = ifelse(table(marker.10x.patient.up[names(temp2[temp2 == "iCMS3"])] %>%
+        unlist())[gene.selected] >= 9 * 0.5, "consensus", "specific")
 )
 table(anno.row$Gene)
+anno.row <- rbind(
+    anno.row %>% filter(Gene == "consensus") %>% arrange(rnorm(nrow(.))),
+    anno.row %>% filter(Gene == "specific")
+)
 
 anno.col <- data.frame(
     row.names = names(temp2),
@@ -370,10 +381,10 @@ plot.data.nor <- apply(plot.data, 1, function(x) {
 })
 plot.data.nor[plot.data.nor > 1.5] <- 1.5
 plot.data.nor[plot.data.nor < -1.5] <- -1.5
-names(ArchR::ArchRPalettes)
+
 png("NG_10X/Heatmap.DEG.patient.iCMS3.png", 600, 300)
 pheatmap::pheatmap(
-    plot.data.nor,
+    plot.data.nor[anno.col$iCMS != "iCMS2", ],
     annotation_col = anno.row,
     annotation_row = anno.col,
     cluster_rows = FALSE,
@@ -384,7 +395,8 @@ pheatmap::pheatmap(
     annotation_colors = list(
         iCMS = c("Normal" = "#208a42", "iCMS2" = "#283891", "iCMS3" = "#62b7e6"),
         Gene = c("consensus" = "#86d786", "specific" = "#f6be43")
-    )
+    ),
+    gaps_col = c(508)
 )
 dev.off()
 

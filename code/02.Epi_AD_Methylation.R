@@ -1079,7 +1079,8 @@ for (one in patient.selected[2:6]) {
 }
 rm(v, one)
 
-# fraction of patient
+## 4.5. compare AD and Ca peaks by patient ----
+# compare AD and Ca
 Pct_AD_Frac <- function(x, y) {
     x <- unique(x)
     y <- unique(y)
@@ -1124,6 +1125,42 @@ pheatmap::pheatmap(plot.data[2:6, 2:6],
     cluster_rows = FALSE, cluster_cols = FALSE,
     annotation_row = data.frame(row.names = rownames(plot.data), "AD" = rep("Adnenoma", 6)),
     annotation_col = data.frame(row.names = rownames(plot.data), "Ca" = rep("Malignant", 6)),
+    cluster_method = "ward.D",
+    border_color = NA,
+)
+dev.off()
+
+# compare AD between patients
+plot.data <- matrix(0, nrow = length(diff_peaks_patient_AD), ncol = length(diff_peaks_patient_AD))
+rownames(plot.data) <- colnames(plot.data) <- names(diff_peaks_patient_AD)
+
+for (i in seq_len(length(diff_peaks_patient_AD))) {
+    for (j in seq_len(length(diff_peaks_patient_AD))) {
+        plot.data[i, j] <- Jaccard_Sim(diff_peaks_patient_AD[[i]]$Up, diff_peaks_patient_AD[[j]]$Up)
+    }
+}
+diag(plot.data) <- NA
+pdf("Paired_Sample/Heatmap.Jaccard.Ad.patients.Up.pdf", 7, 5)
+pheatmap(plot.data[2:6, 2:6],
+    cluster_rows = FALSE, cluster_cols = FALSE,
+    annotation_row = data.frame(row.names = rownames(plot.data), "AD" = rep("Adnenoma", 6)),
+    annotation_col = data.frame(row.names = rownames(plot.data), "AD" = rep("Adnenoma", 6)),
+    cluster_method = "ward.D",
+    border_color = NA,
+)
+dev.off()
+
+for (i in seq_len(length(diff_peaks_patient_AD))) {
+    for (j in seq_len(length(diff_peaks_patient_AD))) {
+        plot.data[i, j] <- Pct_Ca_Frac(diff_peaks_patient_AD[[i]]$Down, diff_peaks_patient_AD[[j]]$Down)
+    }
+}
+diag(plot.data) <- NA
+pdf("Paired_Sample/Heatmap.Jaccard.Ad.patients.Down.pdf", 7, 5)
+pheatmap::pheatmap(plot.data[2:6, 2:6],
+    cluster_rows = FALSE, cluster_cols = FALSE,
+    annotation_row = data.frame(row.names = rownames(plot.data), "AD" = rep("Adnenoma", 6)),
+    annotation_col = data.frame(row.names = rownames(plot.data), "AD" = rep("Adnenoma", 6)),
     cluster_method = "ward.D",
     border_color = NA,
 )

@@ -513,7 +513,7 @@ rm(sw, sb, sws, one, chr.anno, plot.data, temp)
 # medicc2 CNV.subclone.arm.txt ./MEDICC2 --total-copy-numbers --input-allele-columns cn_total
 
 # 3. differential analysis ----
-## 3.1. identify subtype peaks  ----
+## 3.1. identify sobclone peaks  ----
 sample.info.epi$is_COAD32 <- "None"
 sample.info.epi[sample.info.epi$Patient == "COAD32", ]$is_COAD32 <- "COAD32"
 proj_Epi$is_COAD32 <- sample.info.epi$is_COAD32
@@ -781,6 +781,7 @@ plotFootprints(
 )
 
 # 4. Validate in other patients ----
+dir.create("All_patient")
 subclone.list <- readRDS("subclone.list.rds")
 sample.info.epi$Subclone_all <- "None"
 
@@ -790,11 +791,13 @@ for (patient in names(subclone.list)) {
             subclone.list[[patient]][[subclone]], ]$Subclone_all <- paste(patient, subclone, sep = "_")
     }
 }
+sample.info.epi[sample.info.epi$Epi_type == "Normal", ]$Subclone_all <- "Normal"
 table(sample.info.epi$Subclone_all)
 
 proj_Epi$Subclone_all <- sample.info.epi$Subclone_all
 colnames(sample.info.epi)
 
+## 4.1. iCMS modules and TFs ----
 # iCMS modules
 p <- plotGroups(
     ArchRProj = proj_Epi,
@@ -810,7 +813,7 @@ plot.data <- plot.data %>%
     Subclone = gsub("^.+?_", "", Subclone_all)) %>%
     filter(Patient %in% c("COAD12", "COAD17", "COAD24", "COAD33"))
 
-pdf("Violin.all.Module.iCMS2.pdf", 5, 3)
+pdf("All_patient/Violin.all.Module.iCMS2.pdf", 5, 3)
 ggplot(plot.data, aes(x = Subclone, y = Module.iCMS2, fill = Subclone)) +
     geom_violin() +
     ggpubr::stat_compare_means(
@@ -838,7 +841,7 @@ plot.data <- plot.data %>%
     Subclone = gsub("^.+?_", "", Subclone_all)) %>%
     filter(Patient %in% c("COAD12", "COAD17", "COAD24", "COAD33"))
 
-pdf("Violin.all.PPARA.pdf", 5, 3)
+pdf("All_patient/Violin.all.PPARA.pdf", 5, 3)
 ggplot(plot.data, aes(x = Subclone, y = Activity, fill = Subclone)) +
     geom_violin() +
     ggpubr::stat_compare_means(
@@ -857,7 +860,7 @@ plot.data <- plot.data %>%
     Subclone = gsub("^.+?_", "", Subclone_all)) %>%
     filter(Patient %in% c("COAD12", "COAD17", "COAD24", "COAD33"))
 
-pdf("Violin.all.HNF4A.pdf", 5, 3)
+pdf("All_patient/Violin.all.HNF4A.pdf", 5, 3)
 ggplot(plot.data, aes(x = Subclone, y = Activity, fill = Subclone)) +
     geom_violin() +
     ggpubr::stat_compare_means(
@@ -869,6 +872,70 @@ ggplot(plot.data, aes(x = Subclone, y = Activity, fill = Subclone)) +
     theme_classic()
 dev.off()
 
+## 4.2. heatmap for each patient ----
+sePeaks <- getGroupSE(
+    ArchRProj = proj_Epi,
+    useMatrix = "PeakMatrix",
+    groupBy = "Subclone_all",
+    divideN = TRUE,
+    scaleTo = NULL
+)
+PeakMatrix.subclone <- sePeaks@assays@data$PeakMatrix
+rownames(PeakMatrix.subclone) <- rowData(sePeaks) %>%
+    as.data.frame() %>%
+    mutate("id" = paste(seqnames, start, end, sep = "_")) %>%
+    pull(id)
+
+for (patient in patient.selected) {
+    message(paste("identify subclone markers for ", patient, " ...", sep = ""))
+    marker.subclone.one <- getMarkerFeatures(
+        ArchRProj = proj_Epi,
+        useMatrix = "PeakMatrix",
+        groupBy = "Subclone_all",
+        testMethod = "wilcoxon",
+        bias = c("TSSEnrichment", "log10(nFrags)"),
+        useGroups = grep(patient, unique(proj_Epi$Subclone_all), value = TRUE),
+        bgdGroups = c("Normal")
+    )
+
+    marker.subclone <- getMarkers(marker.subclone.one,
+        cutOff = "FDR <= 0.01 & Log2FC >= 1"
+    ) %>%
+        lapply(., as.data.frame)
+
+    marker.subclone.id <- lapply(marker.subclone, function(x) {
+        x <- x %>%
+            mutate(
+                peak_id = paste(seqnames, start, end, sep = "_")
+            )
+        return(x$peak_id)
+    }) %>%
+        unlist() %>%
+            unique()
+
+    plot.data <- PeakMatrix.subclone[
+        marker.subclone.id,
+        c("Normal", grep(patient, colnames(PeakMatrix.subclone), value = TRUE))
+    ]
+    colnames(plot.data) <- gsub("COAD.+?_", "", colnames(plot.data))
+    plot.data <- apply(plot.data, 1, function(x) {
+        x <- x - mean(x)
+        x <- x / sd(x)
+        return(x)
+    })
+    plot.data[plot.data > 1.5] <- 1.5
+    plot.data[plot.data < (-1.5)] <- (-1.5)
+
+    pdf(paste0("All_patient/Heatmap.marker.", patient, ".peaks.subclone.pdf"), 7, 3.5)
+    pheatmap::pheatmap(plot.data,
+        scale = "column",
+        cluster_rows = FALSE,
+        cluster_cols = FALSE,
+        show_colnames = FALSE,
+        main = length(marker.subclone.id)
+    )
+    dev.off()
+}
 
 gc()
 save.image("Epi_intratumor.RData")
