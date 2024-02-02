@@ -340,6 +340,14 @@ marker.peak.down.list <- getMarkers(markersPeaks.CIMP,
 
 lapply(marker.peak.down.list, length)
 
+temp <- names(marker.peak.up.list$CIMP_High) %>% # 4408
+    setdiff(names(marker.peak.up.list$CIMP_Negative)) %>% # 15008
+    setdiff(names(marker.peak.up.list$CIMP_Low))
+temp <- marker.peak.up.list$CIMP_High[temp, ] %>% as.data.frame()
+table(temp$peakType)
+temp <- temp %>% filter(peakType == "Promoter")
+write.csv(temp, "marker.peak.tumor.CIMP_High.promoter.csv")
+
 for (one in c("CIMP_High", "CIMP_Low", "CIMP_Negative")) {
     plot.data1 <- table(marker.peak.up.list[[one]]$peakType) %>%
         as.data.frame() %>%
