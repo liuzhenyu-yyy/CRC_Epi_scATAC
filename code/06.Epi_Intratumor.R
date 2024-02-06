@@ -885,7 +885,7 @@ rownames(PeakMatrix.subclone) <- rowData(sePeaks) %>%
     as.data.frame() %>%
     mutate("id" = paste(seqnames, start, end, sep = "_")) %>%
     pull(id)
-
+patient <- "COAD30"
 for (patient in patient.selected) {
     message(paste("identify subclone markers for ", patient, " ...", sep = ""))
     marker.subclone.one <- getMarkerFeatures(
@@ -918,6 +918,9 @@ for (patient in patient.selected) {
         c("Normal", grep(patient, colnames(PeakMatrix.subclone), value = TRUE))
     ]
     colnames(plot.data) <- gsub("COAD.+?_", "", colnames(plot.data))
+    if (patient == "COAD30") {
+        plot.data <- plot.data[, c(1, 3:5)]
+    }
     plot.data <- apply(plot.data, 1, function(x) {
         x <- x - mean(x)
         x <- x / sd(x)
@@ -926,7 +929,7 @@ for (patient in patient.selected) {
     plot.data[plot.data > 1.5] <- 1.5
     plot.data[plot.data < (-1.5)] <- (-1.5)
 
-    pdf(paste0("All_patient/Heatmap.marker.", patient, ".peaks.subclone.pdf"), 7, 3.5)
+    pdf(paste0("All_patient/Heatmap.marker.", patient, ".peaks.subclone2.pdf"), 7, 3.5)
     pheatmap::pheatmap(plot.data,
         scale = "column",
         cluster_rows = FALSE,

@@ -17,6 +17,7 @@ mycolor <- list()
 table(proj_CRC$Clusters_type)
 proj_CRC$Clusters_type <- gsub("_.+?$", "", proj_CRC$Clusters_type)
 proj_CRC$Clusters_type <- gsub("Macrophages", "Myeloid", proj_CRC$Clusters_type)
+View(proj_CRC@cellColData %>% as.data.frame())
 
 mycolor$Clusters_type <- paletteDiscrete(proj_CRC$Clusters_type, set = "summerNight")
 names(ArchRPalettes)
@@ -54,6 +55,31 @@ p <- plotEmbedding(
     size = 0.2, plotAs = "points"
 )
 pdf("UMAP.All.Clusters.pdf", 7, 7)
+plot(p)
+dev.off()
+
+temp <- proj_CRC$cell_type
+temp[temp == "C11"] <- "C1"
+temp[temp == "C12"] <- "C3"
+temp[temp == "LN"] <- "C2"
+
+temp[!temp %in% c("C1", "C2", "C3")] <- "None"
+
+temp <- paste(proj_CRC$Sample_2, temp, sep = "_")
+temp[grep("None", temp)] <- "None"
+
+proj_CRC$Replication <- temp
+
+# colors <- paletteDiscrete(proj_Epi$Replication)
+# colors["None"] <- "gray75"
+p <- plotEmbedding(
+    ArchRProj = proj_CRC, colorBy = "cellColData",
+    name = "Replication", embedding = "UMAP",
+    size = 0.2, plotAs = "points",
+    pal = colors,
+    labelMeans = FALSE
+)
+pdf("UMAP.All.Replication.pdf", 7, 7)
 plot(p)
 dev.off()
 
@@ -148,7 +174,7 @@ ggplot() +
         )
 dev.off()
 
-## 2.4 big wig for IGV visualization ----
+## 2.4. big wig for IGV visualization ----
 table(proj_CRC$Clusters_type)
 proj_CRC <- addGroupCoverages(
     ArchRProj = proj_CRC,
@@ -347,6 +373,35 @@ p <- plotEmbedding(
 )
 
 pdf("UMAP.Epi.Type_location.pdf", 7, 7)
+plot(p)
+dev.off()
+
+proj_Epi$Sample_2 <- gsub("-nofacs", "", proj_Epi$Sample)
+proj_Epi$Sample_2 <- rename.patient[proj_Epi$Sample_2]
+
+temp <- proj_Epi$cell_type
+table(proj_Epi$Sample_2, proj_Epi$cell_type)
+temp[temp == "C11"] <- "C1"
+temp[temp == "C12"] <- "C3"
+temp[temp == "LN"] <- "C2"
+
+temp[!temp %in% c("C1", "C2", "C3")] <- "None"
+
+temp <- paste(proj_Epi$Sample_2, temp, sep = "_")
+temp[grep("None", temp)] <- "None"
+
+proj_Epi$Replication <- temp
+
+colors <- paletteDiscrete(proj_Epi$Replication)
+colors["None"] <- "gray75"
+p <- plotEmbedding(
+    ArchRProj = proj_Epi, colorBy = "cellColData",
+    name = "Replication", embedding = "UMAP",
+    size = 0.2, plotAs = "points",
+    pal = colors,
+    labelMeans = FALSE
+)
+pdf("UMAP.Epi.Replication.pdf", 7, 7)
 plot(p)
 dev.off()
 

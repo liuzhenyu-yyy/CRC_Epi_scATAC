@@ -186,7 +186,7 @@ dev.off()
 markers <- c(
     "PTPRC", "CD3D", "CD3G", "CD79A", "MS4A1", "CD14", "CD68",
     "EPCAM", "LOC101928540", "MIR4463", "PCSK9", "F2RL3",
-    "PECAM1", "CDH5", "VIM", "COL2A1"
+    "PECAM1", "CDH5", "VIM", "COL2A1", "LGR5", "ASCL2"
 )
 proj_NG <- addImputeWeights(proj_NG)
 
@@ -197,8 +197,8 @@ p <- plotEmbedding(
     imputeWeights = getImputeWeights(proj_NG),
     size = 0.2, plotAs = "points"
 )
-pdf("NG_ATAC/UMAP.Marker.Gene.pdf", 20, 20)
-patchwork::wrap_plots(p, ncol = 4)
+pdf("NG_ATAC/UMAP.Marker.Gene.pdf", 25, 15)
+patchwork::wrap_plots(p, ncol = 6)
 dev.off()
 
 # gene module
@@ -261,6 +261,7 @@ sample.info.NG[sample.info.NG$Clusters %in% paste0("C", c(12, 18:19)), "Cell_typ
 sample.info.NG[sample.info.NG$Clusters %in% paste0("C", c(11, 13, 20, 21, 17)), "Cell_type_1"] <- "Adenoma_Early"
 sample.info.NG[sample.info.NG$Clusters %in% paste0("C", c(14:16, 7:10)), "Cell_type_1"] <- "Adenoma_Late"
 sample.info.NG[sample.info.NG$Clusters %in% paste0("C", c(6, 25:28)), "Cell_type_1"] <- "Intermediate"
+sample.info.NG[sample.info.NG$Clusters %in% paste0("C", c(19)), "Cell_type_1"] <- "Stem-like"
 table(sample.info.NG$Cell_type_1)
 table(sample.info.NG$Cell_type_1, sample.info.NG$Clusters)
 proj_NG$Cell_type_1 <- sample.info.NG$Cell_type_1
@@ -284,7 +285,7 @@ marker.peak.NG <- getMarkerFeatures(
     testMethod = "wilcoxon",
     bias = c("TSSEnrichment", "log10(nFrags)"),
     useGroups = c("Adenoma_Early", "Adenoma_Late", "Malignant"),
-    bgdGroups = "Normal"
+    bgdGroups = "Stem-like"
 )
 
 for (one in c("Adenoma_Early", "Adenoma_Late", "Malignant")) {
@@ -295,7 +296,7 @@ for (one in c("Adenoma_Early", "Adenoma_Late", "Malignant")) {
         cutOff = "FDR <= 0.05 & abs(Log2FC) >= 0.1",
         plotAs = "Volcano"
     )
-    pdf(paste("NG_ATAC/Volcano.markers.", one, ".pdf", sep = ""), 5, 4)
+    pdf(paste("NG_ATAC/Volcano.markers.stem.", one, ".pdf", sep = ""), 5, 4)
     plot(pv)
     dev.off()
     rm(pv, one)
@@ -328,13 +329,13 @@ sapply(marker.NG.down.list, length)
 ## 2.2 compare with out data ----
 marker.up.list <- list(
     "Adenoma" = read.table(
-        file.path("T_AD_C_Diff_Peak", "T_vs_AD_ADhigh_peak.txt"),
+        file.path("data/T_AD_C_Diff_Peak", "T_vs_AD_ADhigh_peak.txt"),
         header = TRUE, row.names = 1
     ) %>%
         mutate(peak_id = paste(seqnames, start, end, sep = "_")) %>%
         pull(peak_id),
     "Malignant" = read.table(
-        file.path("T_AD_C_Diff_Peak", "T_vs_C_Chigh_peak.txt"),
+        file.path("data/T_AD_C_Diff_Peak", "T_vs_C_Chigh_peak.txt"),
         header = TRUE, row.names = 1
     ) %>%
         mutate(peak_id = paste(seqnames, start, end, sep = "_")) %>%
@@ -342,13 +343,13 @@ marker.up.list <- list(
 )
 marker.down.list <- list(
     "Adenoma" = read.table(
-        file.path("T_AD_C_Diff_Peak", "T_vs_AD_Thigh_peak.txt"),
+        file.path("data/T_AD_C_Diff_Peak", "T_vs_AD_Thigh_peak.txt"),
         header = TRUE, row.names = 1
     ) %>%
         mutate(peak_id = paste(seqnames, start, end, sep = "_")) %>%
         pull(peak_id),
     "Malignant" = read.table(
-        file.path("T_AD_C_Diff_Peak", "T_vs_C_Thigh_peak.txt"),
+        file.path("data/T_AD_C_Diff_Peak", "T_vs_C_Thigh_peak.txt"),
         header = TRUE, row.names = 1
     ) %>%
         mutate(peak_id = paste(seqnames, start, end, sep = "_")) %>%
@@ -361,7 +362,7 @@ v <- Vennerable::Venn(list(
     "NG_continuum" = marker.NG.up.list$Malignant,
     "scATAC" = marker.up.list$Malignant
 ))
-pdf("NG_ATAC/Venn.Malignant.Up.pdf", 10, 10)
+pdf("NG_ATAC/Venn.Malignant.stem.Up.pdf", 10, 10)
 plot(v, doWeights = TRUE, doEuler = TRUE, show = list(Faces = FALSE))
 dev.off()
 
@@ -369,7 +370,7 @@ v <- Vennerable::Venn(list(
     "NG_continuum" = marker.NG.down.list$Malignant,
     "scATAC" = marker.down.list$Malignant
 ))
-pdf("NG_ATAC/Venn.Malignant.Down.pdf", 10, 10)
+pdf("NG_ATAC/Venn.Malignant.Down.stem.pdf", 10, 10)
 plot(v, doWeights = TRUE, doEuler = TRUE, show = list(Faces = FALSE))
 dev.off()
 
@@ -377,7 +378,7 @@ v <- Vennerable::Venn(list(
     "NG_continuum" = marker.NG.up.list$Adenoma_Late,
     "scATAC" = marker.up.list$Adenoma
 ))
-pdf("NG_ATAC/Venn.Adenoma.Up.pdf", 10, 10)
+pdf("NG_ATAC/Venn.Adenoma.stem.Up.pdf", 10, 10)
 plot(v, doWeights = TRUE, doEuler = TRUE, show = list(Faces = FALSE))
 dev.off()
 
@@ -385,7 +386,7 @@ v <- Vennerable::Venn(list(
     "NG_continuum" = marker.NG.down.list$Adenoma_Late,
     "scATAC" = marker.down.list$Adenoma
 ))
-pdf("NG_ATAC/Venn.Adenoma.Down.pdf", 10, 10)
+pdf("NG_ATAC/Venn.Adenoma.stem.Down.pdf", 10, 10)
 plot(v, doWeights = TRUE, doEuler = TRUE, show = list(Faces = FALSE))
 dev.off()
 
