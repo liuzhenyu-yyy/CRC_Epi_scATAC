@@ -18,7 +18,6 @@ getAvailableMatrices(proj_CRC)
 mean(proj_CRC$TSSEnrichment)
 colnames(proj_CRC@cellColData)
 table(proj_CRC$Clusters_type)
-
 mycolor <- list()
 
 # 2. basic visulization of all cells----

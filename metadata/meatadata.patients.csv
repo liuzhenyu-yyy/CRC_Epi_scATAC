@@ -1,0 +1,30 @@
+Patient,Gender,Age,Primary Site,Side,MSI_Status,Old_ID, NO. of Cells, NO. of  Epithelial Cells
+P01,Male,63,Sigmoid colon,Left,MSS,COAD02,455,146
+P02,Female,47,Right hemicolon,Right,MSS,COAD03,498,185
+P03,Female,65,Right hemicolon,Right,MSS,COAD05,767,504
+P04,Female,65,Rectum,Left,MSS,COAD06,663,268
+P05,Male,78,Sigmoid colon,Left,MSS,COAD07,573,253
+P06,Female,79,Sigmoid colon,Left,MSS,COAD09,382,153
+P07,Male,68,Right hemicolon,Right,MSS,COAD11,378,218
+P08,Female,67,Sigmoid colon,Left,MSS,COAD12,946,775
+P09,Male,76,Rectum,Left,MSS,COAD13,949,234
+P10,Female,44,Rectum,Left,MSS,COAD15,645,613
+P11,Male,68,Sigmoid colon,Left,MSS,COAD16,754,545
+P12,Male,68,Rectum,Left,NA,COAD17,473,382
+P13,Male,61,Sigmoid colon,Left,NA,COAD18,654,511
+P14,Female,56,Sigmoid colon,Left,MSS,COAD19,380,305
+P15,Female,59,Right hemicolon,Right,MSI-H,COAD20,573,326
+P16,Male,47,Right hemicolon,Right,MSS,COAD21,375,256
+P17,Male,62,Sigmoid colon,Left,NA,COAD22,459,318
+P18,Female,59,Caecum,Right,MSS,COAD23,659,473
+P19,Female,61,Sigmoid colon,Left,MSS,COAD24,751,660
+P20,Female,81,Rectum,Left,MSS,COAD25,95,87
+P21,Female,52,Sigmoid colon,Left,MSS,COAD26,472,400
+P22,Female,61,Ascending colon,Right,MSS,COAD27,653,403
+P23,Female,71,Caecum,Right,MSS,COAD28,740,542
+P24,Female,38,Ascending colon,Right,MSI-H,COAD30,727,414
+P25,Female,54,Sigmoid colon,Left,MSS,COAD31,337,298
+P26,Male,82,Rectum,Left,MSS,COAD32,750,692
+P27,Female,69,Rectum,Left,MSS,COAD33,383,347
+P28,Male,75,Right hemicolon,Right,MSI-H,COAD34,717,555
+P29,Female,81,Rectum,Left,MSS,COAD35,570,386
