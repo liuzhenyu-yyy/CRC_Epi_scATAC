@@ -1,4 +1,13 @@
-setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/03.Epi_AD_Methylation")
+#####################################################
+#
+# Re-analysis of Gastroenterology CRC methylation data
+# Author: Zhenyu Liu
+# Data source: NCBI Gene Expression Omnibus GSE48684
+# Citation: https://www.sciencedirect.com/science/article/pii/S0016508514005952?via%3Dihub
+#
+#####################################################
+
+setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/02.Epi_AD_Methylation")
 # load("03.Epi_AD_Methylation.RData")
 source("../../code/00.Requirements.R")
 

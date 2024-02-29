@@ -1,3 +1,13 @@
+####################################################################
+# scATAC analysis for CRC scATAC project
+# Tang Lab 2019-2024
+#
+# 03. Unsupervised analysis of malignant cells & 
+#     epigenetic features of iCMS subtypes
+# Author: @liuzhenyu
+#
+####################################################################
+
 setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/03.Epi_Molecular_Subtype")
 source("../../code/00.Requirements.R")
 load("Epi_Molecular_Subtype.RData")

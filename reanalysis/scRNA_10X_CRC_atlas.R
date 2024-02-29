@@ -1,6 +1,7 @@
 #####################################################
 #
 # Re-analysis of Nature Genetics CRC 10X atlas
+# Author: Zhenyu Liu
 # Data source: NCBI Gene Expression Omnibus GSE132465
 # Citation: https://www.nature.com/articles/s41588-020-0636-z
 #

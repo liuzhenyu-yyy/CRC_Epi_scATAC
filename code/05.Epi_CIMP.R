@@ -1,5 +1,14 @@
-setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/04.Epi_CIMP")
-load("04.Epi_CIMP.RData")
+####################################################################
+# scATAC analysis for CRC scATAC project
+# Tang Lab 2019-2024
+#
+# 05. Analysis of CIMP subtypes
+# Author: @liuzhenyu
+#
+####################################################################
+
+setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/05.Epi_CIMP")
+load("05.Epi_CIMP.RData")
 source("../../code/00.Requirements.R")
 
 # 1. Calculate ATAC-CGI matrix ----
@@ -747,4 +756,4 @@ rm(v, motifPositions, TF.CISBP)
 
 proj_Epi <- saveArchRProject(ArchRProj = proj_Epi, load = TRUE)
 saveRDS(cluster.info, "cluster.info.rds")
-save.image("04.Epi_CIMP.RData")
+save.image("05.Epi_CIMP.RData")

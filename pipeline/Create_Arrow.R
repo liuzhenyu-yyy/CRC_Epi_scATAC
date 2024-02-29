@@ -1,3 +1,12 @@
+##########################################################
+###
+### Create arrow files for ArchR
+### Input: fragments file
+### Output: arrow file (for ArchR)
+### Author: Zhenyu Liu
+###
+##########################################################
+
 args <- commandArgs(trailingOnly = TRUE)
 
 ref <- args[1]

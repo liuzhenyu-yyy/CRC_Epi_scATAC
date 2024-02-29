@@ -1,3 +1,12 @@
+##########################################################
+###
+### single-cell CNV analysis for scATAC-seq
+### Input: arrow files of ArchR
+### Output: single-cell CNV profiles
+### Adapted form https://github.com/GreenleafLab/10x-scATAC-2019/blob/master/code/08_Run_scCNV_v2.R
+###
+##########################################################
+
 args <- commandArgs(trailingOnly = TRUE)
 
 # functions ----

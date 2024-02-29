@@ -6,7 +6,6 @@
 ### Input: single-cell demultiplexed pari-end fastq
 ### Output: sorted bam file
 ### Author: Zhenyu Liu
-### Email:  liuzhenyu@pku.edu.cn
 ### 
 ##########################################################
 

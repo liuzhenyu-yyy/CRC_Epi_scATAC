@@ -1,5 +1,15 @@
 #!/bin/sh
 
+
+##########################################################
+###
+### Homer motif enrichment in given peaks
+### Input: genomic regions (bed)
+### Output: motif enrichments
+### Author: Zhenyu Liu
+### 
+##########################################################
+
 findMotifsGenome=/mnt/d/WSL2/homer/bin/findMotifsGenome.pl
 bed_dir=/mnt/e/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/05.Epi_TF_Clustering/diff_peak_cluster/bed
 

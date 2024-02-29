@@ -1,3 +1,12 @@
+####################################################################
+# scATAC analysis for CRC scATAC project
+# Tang Lab 2019-2024
+#
+# 01. Basic analysis of the epithelial altas
+# Author: @liuzhenyu
+#
+####################################################################
+
 setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/01.All_scCNV")
 
 source("../../code/00.Requirements.R")

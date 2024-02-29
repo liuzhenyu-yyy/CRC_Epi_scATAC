@@ -1,3 +1,12 @@
+####################################################################
+# scATAC analysis for CRC scATAC project
+# Tang Lab 2019-2024
+#
+# 00. Requisites
+# Author: @liuzhenyu
+#
+####################################################################
+
 if (TRUE) {
     library(ArchR)
     library(BSgenome)
@@ -20,7 +29,7 @@ if (TRUE) {
 
 if (TRUE) {
     addArchRGenome("hg38")
-    source("E:/LabWork/code/archr_track.R")
+    source("E:/LabWork/code/ArchR_patch/archr_track.R")
     # source("E:/LabWork/code/MyFunction.R")
     # ReadGeneInfo("hg38", classify.protein = FALSE)
 }

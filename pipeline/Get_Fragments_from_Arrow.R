@@ -10,6 +10,15 @@ patient.info <- read.table("patient.txt", header = TRUE, sep = "\t", stringsAsFa
 patient.rename <- patient.info$Patient
 names(patient.rename) <- patient.info$Old_ID
 
+##########################################################
+###
+### Generate fragments file from arrow files
+### Input: arrow file (for ArchR)
+### Output: fragments file
+### Author: Zhenyu Liu
+###
+##########################################################
+
 for (one in names(arrows)) {
     message(Sys.time(), " : ", "Extracting fragment for ", one)
     gr <- getFragmentsFromArrow(

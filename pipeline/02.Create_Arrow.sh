@@ -6,7 +6,6 @@
 ### Input: sorted bam file
 ### Output: fragments file and arrow file (for ArchR)
 ### Author: Zhenyu Liu
-### Email:  liuzhenyu@pku.edu.cn
 ### 
 ##########################################################
 

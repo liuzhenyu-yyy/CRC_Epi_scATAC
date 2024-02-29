@@ -1,3 +1,12 @@
+####################################################################
+# scATAC analysis for CRC scATAC project
+# Tang Lab 2019-2024
+#
+# 02. Chromatin dynamics of early adenomas
+# Author: @liuzhenyu
+#
+####################################################################
+
 setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/02.Epi_AD_Methylation")
 load("02.Epi_AD_Methylation.RData")
 source("../../code/00.Requirements.R")

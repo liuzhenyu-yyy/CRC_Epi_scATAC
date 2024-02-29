@@ -1,5 +1,14 @@
-setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/05.Epi_TF_Clustering")
-load("05.Epi_TF_Clustering.RData")
+####################################################################
+# scATAC analysis for CRC scATAC project
+# Tang Lab 2019-2024
+#
+# 06. Correlation network and TF modules
+# Author: @liuzhenyu
+#
+####################################################################
+
+setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/06.Epi_TF_Module")
+load("06.Epi_TF_Module.RData")
 
 source("../../code/00.Requirements.R")
 rm(foo)
@@ -1054,4 +1063,4 @@ ggplot(plot.data, aes(x = Epi_type, y = Module.AD_Down)) +
     ylab("Module Eigenvalue")
 
 gc()
-save.image("05.Epi_TF_Clustering.RData")
+save.image("06.Epi_TF_Module.RData")

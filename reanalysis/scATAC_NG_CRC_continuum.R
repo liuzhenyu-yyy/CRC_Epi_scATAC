@@ -1,6 +1,7 @@
 #######################################################
 #
 # Re-analysis of Nature Genetics CRC 10X scATAC continuum
+# Author: Zhenyu Liu
 # Data source: NCBI Gene Expression Omnibus GSE201349
 # Citation: https://www.nature.com/articles/s41588-022-01088-x
 #

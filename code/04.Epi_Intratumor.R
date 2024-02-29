@@ -1,4 +1,13 @@
-setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/06.Epi_Intratumor")
+####################################################################
+# scATAC analysis for CRC scATAC project
+# Tang Lab 2019-2024
+#
+# 04. Analysis of intra-tumor subclones
+# Author: @liuzhenyu
+#
+####################################################################
+
+setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/04.Epi_Intratumor")
 load("Epi_intratumor.RData")
 
 source("../../code/00.Requirements.R")
