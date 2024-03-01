@@ -132,36 +132,31 @@ Running under: Windows 10 x64 (build 22631)
 **R packages:**
 ```
 attached base packages:
-[1] stats4    grid      stats     graphics  grDevices utils     datasets  methods   base
+ [1] parallel  stats4    grid      stats     graphics  grDevices utils     datasets  methods   base
 
 other attached packages:
- [1] igraph_1.4.2                             WGCNA_1.72-1
- [3] fastcluster_1.2.3                        dynamicTreeCut_1.63-1
- [5] ggpubr_0.6.0                             NMF_0.26
- [7] cluster_2.1.4                            rngtools_1.5.2
- [9] registry_0.5-1                           clusterProfiler_4.2.2
-[11] LOLA_1.19.1                              ggbeeswarm_0.7.2
-[13] Vennerable_3.1.0.9000                    viridis_0.6.3
-[15] viridisLite_0.4.2                        pheatmap_1.0.12
-[17] patchwork_1.1.2                          org.Hs.eg.db_3.14.0
-[19] genomation_1.26.0                        dplyr_1.1.2
-[21] corrplot_0.92                            UpSetR_1.4.0
-[23] TxDb.Hsapiens.UCSC.hg38.knownGene_3.14.0 GenomicFeatures_1.46.5
-[25] AnnotationDbi_1.56.2                     SeuratObject_4.1.3
-[27] Seurat_4.3.0                             RColorBrewer_1.1-3
-[29] BSgenome.Hsapiens.UCSC.hg38_1.4.4        BSgenome_1.62.0
-[31] rtracklayer_1.54.0                       Biostrings_2.62.0
-[33] XVector_0.34.0                           rhdf5_2.38.1
-[35] SummarizedExperiment_1.24.0              Biobase_2.54.0
-[37] MatrixGenerics_1.6.0                     Rcpp_1.0.10
-[39] Matrix_1.5-4                             GenomicRanges_1.46.1
-[41] GenomeInfoDb_1.30.1                      IRanges_2.28.0
-[43] S4Vectors_0.32.4                         BiocGenerics_0.40.0
-[45] matrixStats_0.63.0                       data.table_1.14.8
-[47] stringr_1.5.0                            plyr_1.8.8
-[49] magrittr_2.0.3                           ggplot2_3.4.2
-[51] gtable_0.3.3                             gtools_3.9.4
-[53] gridExtra_2.3                            ArchR_1.0.2
+other attached packages:
+ [1] ChIPseeker_1.30.3                        minfi_1.40.0                             bumphunter_1.36.0
+ [4] locfit_1.5-9.7                           iterators_1.0.14                         foreach_1.5.2
+ [7] edgeR_3.36.0                             limma_3.50.3                             readr_2.1.4
+[10] igraph_1.4.2                             WGCNA_1.72-1                             fastcluster_1.2.3
+[13] dynamicTreeCut_1.63-1                    ggpubr_0.6.0                             clusterProfiler_4.2.2
+[16] NMF_0.26                                 cluster_2.1.4                            rngtools_1.5.2
+[19] registry_0.5-1                           LOLA_1.19.1                              ggbeeswarm_0.7.2
+[22] Vennerable_3.1.0.9000                    viridis_0.6.3                            viridisLite_0.4.2
+[25] pheatmap_1.0.12                          patchwork_1.1.2                          org.Hs.eg.db_3.14.0
+[28] genomation_1.26.0                        dplyr_1.1.2                              corrplot_0.92
+[31] UpSetR_1.4.0                             TxDb.Hsapiens.UCSC.hg38.knownGene_3.14.0 GenomicFeatures_1.46.5
+[34] AnnotationDbi_1.56.2                     SeuratObject_4.1.3                       Seurat_4.3.0
+[37] RColorBrewer_1.1-3                       BSgenome.Hsapiens.UCSC.hg38_1.4.4        BSgenome_1.62.0
+[40] rtracklayer_1.54.0                       Biostrings_2.62.0                        XVector_0.34.0
+[43] rhdf5_2.38.1                             SummarizedExperiment_1.24.0              Biobase_2.54.0
+[46] MatrixGenerics_1.6.0                     Rcpp_1.0.10                              Matrix_1.5-4
+[49] GenomicRanges_1.46.1                     GenomeInfoDb_1.30.1                      IRanges_2.28.0
+[52] S4Vectors_0.32.4                         BiocGenerics_0.40.0                      matrixStats_0.63.0
+[55] data.table_1.14.8                        stringr_1.5.0                            plyr_1.8.8
+[58] magrittr_2.0.3                           ggplot2_3.4.2                            gtable_0.3.3
+[61] gtools_3.9.4                             gridExtra_2.3                            ArchR_1.0.2
 ```
 
 ## Questions/Comments:
