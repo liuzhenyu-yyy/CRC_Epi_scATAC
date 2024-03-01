@@ -6,15 +6,15 @@ This is the repository to host code for the CRC scATAC-seq project.
 
 ## Data & metadata
 
-**raw sequencing data**
+**Raw sequencing data**
 
 All sequencing data of scATAC-seq generated in this study have been deposited in the Genome Sequence Archive for Human (GSA-Human, https://ngdc.cncb.ac.cn/gsa-human/) under accession number HRA000992.
 
-**processed data**
+**Processed data**
 
 Processed fragments files of scATAC-seq have been deposited in the Open Archive for Miscellaneous Data (OMIX, https://ngdc.cncb.ac.cn/omix/) under accession number OMIX005759.
 
-**metadata**
+**Metadata**
 
 Metadata for each patient and single cell are available in the `./metadata` of this repository.
 
@@ -91,7 +91,7 @@ Create arrow files as input for ArchR.
 
 ***CNV_from_Arrow.R***
 
-Single-cell CNV analysis. Adapted from https://github.com/GreenleafLab/10x-scATAC-2019.
+Single-cell CNV analysis. Modifed from https://github.com/GreenleafLab/10x-scATAC-2019.
 
 ***Run.Homer.Motif.sh***
 
@@ -134,7 +134,6 @@ Running under: Windows 10 x64 (build 22631)
 attached base packages:
  [1] parallel  stats4    grid      stats     graphics  grDevices utils     datasets  methods   base
 
-other attached packages:
 other attached packages:
  [1] ChIPseeker_1.30.3                        minfi_1.40.0                             bumphunter_1.36.0
  [4] locfit_1.5-9.7                           iterators_1.0.14                         foreach_1.5.2
