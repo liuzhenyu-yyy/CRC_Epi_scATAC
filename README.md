@@ -8,11 +8,11 @@ This is the repository to host code for the CRC scATAC-seq project.
 
 **Raw sequencing data**
 
-All sequencing data of scATAC-seq generated in this study have been deposited in the Genome Sequence Archive for Human (GSA-Human, https://ngdc.cncb.ac.cn/gsa-human/) under accession number HRA000992.
+All sequencing data of scATAC-seq generated in this study have been deposited in the Genome Sequence Archive for Human (GSA-Human, https://ngdc.cncb.ac.cn/gsa-human/) under accession number [HRA000992](https://ngdc.cncb.ac.cn/gsa-human/browse/HRA000992).
 
 **Processed data**
 
-Processed fragments files of scATAC-seq have been deposited in the Open Archive for Miscellaneous Data (OMIX, https://ngdc.cncb.ac.cn/omix/) under accession number OMIX005759.
+Processed fragments files of scATAC-seq have been deposited in the Open Archive for Miscellaneous Data (OMIX, https://ngdc.cncb.ac.cn/omix/) under accession number [OMIX005759](https://ngdc.cncb.ac.cn/omix/release/OMIX005759).
 
 **Metadata**
 
