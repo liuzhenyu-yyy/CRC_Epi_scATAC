@@ -4,6 +4,8 @@ This is the repository to host code for the CRC scATAC-seq project.
 
 ![Fig1A](./metadata/Fig1A.jpg)
 
+For more information about the project, please check our publication on [***Cancer Discovery***](https://aacrjournals.org/cancerdiscovery/article-abstract/doi/10.1158/2159-8290.CD-23-1445/735072/Single-cell-chromatin-accessibility-analysis).
+
 ## Data & metadata
 
 **Raw sequencing data**
@@ -157,6 +159,9 @@ other attached packages:
 [58] magrittr_2.0.3                           ggplot2_3.4.2                            gtable_0.3.3
 [61] gtools_3.9.4                             gridExtra_2.3                            ArchR_1.0.2
 ```
+
+## Citation
+Liu, Z., Hu, Y., Xie, H., Chen, K., Wen, L., Fu, W., Zhou, X., & Tang, F. (2024). Single-cell chromatin accessibility analysis reveals the epigenetic basis and signature transcription factors for the molecular subtypes of colorectal cancers. *Cancer discovery*, 10.1158/2159-8290.CD-23-1445. Advance online publication. https://doi.org/10.1158/2159-8290.CD-23-1445
 
 ## Questions/Comments:
 
