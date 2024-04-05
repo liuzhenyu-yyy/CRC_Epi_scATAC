@@ -129,7 +129,7 @@ Data source: [GSE132465](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE1
 
 - **R environment:**
 
-``` R
+``` text
 R version 4.1.0 (2021-05-18)
 Platform: x86_64-w64-mingw32/x64 (64-bit)
 Running under: Windows 10 x64 (build 22631)
@@ -137,7 +137,7 @@ Running under: Windows 10 x64 (build 22631)
 
 - **R packages:**
 
-``` R
+``` text
 attached base packages:
  [1] parallel  stats4    grid      stats     graphics  grDevices utils     datasets  methods   base
 
@@ -169,7 +169,7 @@ other attached packages:
 
 Please consider citing our paper:
 
- > Liu, Z., Hu, Y., Xie, H., Chen, K., Wen, L., Fu, W., Zhou, X., & Tang, F. (2024). Single-cell chromatin accessibility analysis reveals the epigenetic basis and signature transcription factors for the molecular subtypes of colorectal cancers. *Cancer discovery*, 10.1158/2159-8290.CD-23-1445. Advance online publication. https://doi.org/10.1158/2159-8290.CD-23-1445
+ > Liu, Z., Hu, Y., Xie, H., Chen, K., Wen, L., Fu, W., Zhou, X. & Tang, F. (2024). Single-cell chromatin accessibility analysis reveals the epigenetic basis and signature transcription factors for the molecular subtypes of colorectal cancers. *Cancer Discovery*, OF1-OF24. [link](https://aacrjournals.org/cancerdiscovery/article/doi/10.1158/2159-8290.CD-23-1445/742831/Single-Cell-Chromatin-Accessibility-Analysis)
 
 ## ✉️ Questions/Comments
 
