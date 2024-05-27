@@ -376,6 +376,38 @@ write.table(TF.info, "WGCNA/TF.info.csv",
     sep = ",", quote = FALSE, row.names = FALSE
 )
 
+node.info <- read.table("WGCNA/CytoscapeInput-nodes-all.txt",
+    header = TRUE, sep = "\t"
+)
+colnames(node.info) <- c("Id", "Label", "ME")
+rownames(node.info) <- node.info$Id
+node.info$Family <- TF.info[node.info$Id, "Family"] %>% gsub(",", ";", .)
+node.info$Exp_log <- log10(TF.info[node.info$Id, "GeneScore_Malignant"] + 1)
+
+edge.info <- read.table("WGCNA/CytoscapeInput-edges-all.txt",
+    header = TRUE, sep = "\t"
+)[, c(1, 2, 3)]
+colnames(edge.info) <- c("Source", "Target", "Weight_raw")
+edge.info$fromME <- node.info[edge.info$Source, "ME"]
+edge.info$toME <- node.info[edge.info$Target, "ME"]
+edge.info$Label <- ifelse(edge.info$fromME == edge.info$toME, "Intra", "Inter")
+
+select <- edge.info$Label == "Intra"
+edge.info$Weight <- edge.info$Weight_raw^2
+edge.info$Weight[select] <- (edge.info$Weight_raw[select])^(0.5)
+aggregate(Weight_raw ~ Label, edge.info, quantile)
+aggregate(Weight ~ Label, edge.info, quantile)
+
+edge.info$Label2 <- "Inter"
+edge.info[select, ]$Label2 <- edge.info$toME[select]
+
+write.csv(node.info, "WGCNA/CytoscapeInput-nodes-all.csv",
+    row.names = FALSE, quote = FALSE
+)
+write.csv(edge.info, "WGCNA/CytoscapeInput-edges-all.csv",
+    row.names = FALSE, quote = FALSE
+)
+
 # 3. TF module and clinical trait & cancer subtype ----
 ## 3.1. Module & Trait correlation ----
 MEs <- orderMEs(net$MEs, greyName = "ME0")
@@ -569,6 +601,7 @@ for (i in seq_along(ME.selected)) {
 rm(plot.data, p, i, gene.selected, temp)
 
 # 4. Vlsualization of the network ----
+## 4.1. Module sub-network (igraph) ----
 library("igraph")
 dir.create("Network")
 
@@ -668,6 +701,100 @@ for (one in unique(ME.selected)) {
     dev.off()
 }
 rm(net.sub, one)
+
+## 4.2. Total network (Gephi) ----
+node.info <- read.table("Network/Gephi.Force2.node.csv", sep = ",", header = TRUE)
+edge.info <- read.table("Network/Gephi.Force2.edge.csv", sep = ",", header = TRUE)
+node.info[1:5, ]
+edge.info[1:5, ]
+
+rownames(node.info) <- node.info$Id
+
+edge.info$from_x <- node.info[edge.info$Source, "X"]
+edge.info$from_y <- node.info[edge.info$Source, "Y"]
+edge.info$to_x <- node.info[edge.info$Target, "X"]
+edge.info$to_y <- node.info[edge.info$Target, "Y"]
+edge.info <- edge.info[order(edge.info$weight_raw, decreasing = FALSE), ]
+
+label.info <- aggregate(node.info$X, by = list(node.info$me), FUN = mean) %>%
+    mutate(
+        y = aggregate(node.info$Y, by = list(node.info$me), FUN = mean)$x,
+        sd_x = aggregate(node.info$X, by = list(node.info$me), FUN = sd)$x,
+        sd_y = aggregate(node.info$Y, by = list(node.info$me), FUN = sd)$x
+    ) %>%
+    mutate(
+        x_alt = x + sd_x * 2.5,
+        y_alt = y + sd_y * 2.5
+    )
+
+pdf("Network/Gephi.Force2.module.pdf", 7, 7)
+ggplot() +
+    geom_segment(
+        data = edge.info %>% dplyr::filter(weight_raw > 0.1),
+        aes(x = from_x, y = from_y, xend = to_x, yend = to_y),
+        size = 0.1, color = "gray85"
+    ) +
+    geom_point(
+        data = node.info, size = 4,
+        aes(x = X, y = Y, fill = gsub("ME", "", me)),
+        pch = 21, color = "black"
+    ) +
+    geom_text(
+        data = label.info %>% dplyr::filter(Group.1 != "ME0"),
+        aes(x = x, y = y_alt, label = Group.1, color = gsub("ME", "", Group.1)),
+        size  = 5
+    ) +
+    scale_fill_manual(values = mycolor$TF_Module) +
+    scale_color_manual(values = mycolor$TF_Module) +
+    coord_fixed() +
+    theme_void() + theme(legend.position = "none")
+dev.off()
+
+table(node.info$family) %>% sort()
+
+temp <- setdiff(names(sort(table(node.info$family), decreasing = TRUE)), names(mycolor$TF_Family)) %>%
+    setdiff("Unknown")
+temp.color <- RColorBrewer::brewer.pal(10, "Set3")
+names(temp.color) <- temp[seq_along(temp.color)]
+temp.color <- c(mycolor$TF_Family, temp.color)
+
+table(node.info$family %in% names(temp.color))
+node.info[!node.info$family %in% names(temp.color), "family"] <- "Others"
+node.info$family <- factor(node.info$family, levels = names(temp.color) %>% setdiff("Others") %>% c(., "Others"))
+
+pdf("Network/Gephi.Force2.family.pdf", 7, 7)
+ggplot() +
+    geom_segment(
+        data = edge.info %>% dplyr::filter(weight_raw > 0.1),
+        aes(x = from_x, y = from_y, xend = to_x, yend = to_y),
+        size = 0.1, color = "gray85"
+    ) +
+    geom_point(
+        data = node.info, size = 4,
+        aes(x = X, y = Y, fill = family),
+        pch = 21, color = "black"
+    ) +
+    scale_fill_manual(values = temp.color) +
+    coord_fixed() +
+    theme_void() + theme(legend.position = "none")
+dev.off()
+
+pdf("Network/Gephi.Force2.family2.pdf", 8, 7)
+ggplot() +
+    geom_segment(
+        data = edge.info %>% dplyr::filter(weight_raw > 0.1),
+        aes(x = from_x, y = from_y, xend = to_x, yend = to_y),
+        size = 0.1, color = "gray85"
+    ) +
+    geom_point(
+        data = node.info, size = 4,
+        aes(x = X, y = Y, fill = family),
+        pch = 21, color = "black"
+    ) +
+    scale_fill_manual(values = c(mycolor$TF_Family, temp.color)) +
+    coord_fixed() +
+    theme_void()
+dev.off()
 
 # 5. TF enrichment in each patient ----
 dir.create("TF_motif_cluster")
