@@ -169,7 +169,7 @@ other attached packages:
 
 Please consider citing our paper:
 
- > Liu, Z., Hu, Y., Xie, H., Chen, K., Wen, L., Fu, W., Zhou, X. & Tang, F. (2024). Single-cell chromatin accessibility analysis reveals the epigenetic basis and signature transcription factors for the molecular subtypes of colorectal cancers. *Cancer Discovery*, OF1-OF24. [link](https://aacrjournals.org/cancerdiscovery/article/doi/10.1158/2159-8290.CD-23-1445/742831/Single-Cell-Chromatin-Accessibility-Analysis)
+ > Liu, Z., Hu, Y., Xie, H., Chen, K., Wen, L., Fu, W., Zhou, X., & Tang, F. (2024). Single-Cell Chromatin Accessibility Analysis Reveals the Epigenetic Basis and Signature Transcription Factors for the Molecular Subtypes of Colorectal Cancers. *Cancer Discovery*, 14(6), 1082–1105. https://doi.org/10.1158/2159-8290.CD-23-1445
 
 ## ✉️ Questions/Comments
 
