@@ -19,12 +19,15 @@ names(patient.rename) <- patient.info$Old_ID
 ###
 ##########################################################
 
-for (one in names(arrows)) {
+for (one in names(arrows)[10:29]) {
     message(Sys.time(), " : ", "Extracting fragment for ", one)
     gr <- getFragmentsFromArrow(
         ArrowFile = arrows[one]
     )
-    gr$RG %>% as.character()
+    # gr$RG %>% as.character()
+
+    gr <- sortSeqlevels(gr)
+    gr <- sort(gr)
 
     df <- data.frame(
         chrom = seqnames(gr),
@@ -35,8 +38,10 @@ for (one in names(arrows)) {
     )
 
     message(Sys.time(), " : ", "Writing into files for ", one)
-    write.table(df,
-        file = paste0("F:/temp/", patient.rename[one], "_fragments.tsv"),
+    data.table::fwrite(df,
+        file = paste0("./", patient.rename[one], ".sort.fragments.tsv.gz"),
         quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE
     )
+    rm(gr, df, one)
+    gc()
 }
