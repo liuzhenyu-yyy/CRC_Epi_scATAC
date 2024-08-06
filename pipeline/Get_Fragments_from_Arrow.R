@@ -1,3 +1,12 @@
+##########################################################
+###
+### Generate fragments file from arrow files
+### Input: arrow file (for ArchR)
+### Output: fragments file
+### Author: Zhenyu Liu
+###
+##########################################################
+
 setwd("E:/LabWork/Project/CRC_NGS_ATAC/CRC_Epi_scATAC/Results/Export")
 
 source("../../code/00.Requirements.R")
@@ -9,17 +18,9 @@ names(arrows) <- basename(arrows) %>% gsub("\\.arrow$|-nofacs", "", .)
 patient.info <- read.table("patient.txt", header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 patient.rename <- patient.info$Patient
 names(patient.rename) <- patient.info$Old_ID
+options(scipen = 999)
 
-##########################################################
-###
-### Generate fragments file from arrow files
-### Input: arrow file (for ArchR)
-### Output: fragments file
-### Author: Zhenyu Liu
-###
-##########################################################
-
-for (one in names(arrows)[10:29]) {
+for (one in names(arrows)[29]) {
     message(Sys.time(), " : ", "Extracting fragment for ", one)
     gr <- getFragmentsFromArrow(
         ArrowFile = arrows[one]
