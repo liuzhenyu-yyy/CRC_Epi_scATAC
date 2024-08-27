@@ -746,6 +746,9 @@ markersPeaks <- getMarkerFeatures(
     bias = c("TSSEnrichment", "log10(nFrags)"),
     testMethod = "wilcoxon"
 )
+saveRDS(markersPeaks, "markersPeaks.all.rds")
+markersPeaks <- readRDS("markersPeaks.all.rds")
+
 markerList <- getMarkers(markersPeaks, cutOff = "FDR <= 0.001 & Log2FC >= 1")
 marker.list <- sapply(markerList, function(x) {
     x <- x %>%
@@ -884,6 +887,75 @@ pheatmap::pheatmap(plot.data,
 )
 dev.off()
 
+# 8. plot peak distribution ----
+## 8.1 cCREs annotation ----
+length(proj_CRC@peakSet) # 668142
+length(proj_Epi@peakSet) # 528540
+peaks <- proj_Epi@peakSet
+
+cCRE.bed <- as.data.frame(fread("E:/LabWork/genome/hg38/cCREs/cCRE.tablle.tsv",
+    stringsAsFactors = FALSE
+))
+table(cCRE.bed$encodeLabel)
+
+colnames(cCRE.bed)[1:3] <- c("chr", "start", "end")
+cCRE.bed <- GRanges(cCRE.bed)
+
+cCRE.bed$encodeLabel <- factor(cCRE.bed$encodeLabel, levels = c(
+    "PLS", "pELS",
+    "dELS", "DNase-H3K4me3",
+    "CTCF-only"
+))
+table(countOverlaps(peaks, cCRE.bed))
+
+hit <- as.data.frame(findOverlaps(peaks, cCRE.bed, maxgap = 500))
+hit$encodeLabel <- cCRE.bed[hit$subjectHits]$encodeLabel
+hit <- hit[order(hit$encodeLabel), ]
+hit <- hit[!duplicated(hit$queryHits), ]
+
+peaks$encodeLabel <- "none"
+peaks[hit$queryHits]$encodeLabel <- as.character(hit$encodeLabel)
+table(peaks$encodeLabel)
+peaks$encodeLabel <- factor(peaks$encodeLabel, levels = c(
+    "PLS", "pELS",
+    "dELS", "DNase-H3K4me3",
+    "CTCF-only", "none"
+))
+
+## 8.2 plot ----
+plot.data <- as.data.frame(table(peaks$peakType))
+plot.data$percent <- paste0(format(round(plot.data$Freq * 100 / sum(plot.data$Freq), 1),
+    trim = TRUE
+), "%")
+colnames(plot.data)[1] <- "Region"
+plot.data$Label <- paste(plot.data$Freq, "\n(", plot.data$percent,")", sep = "")
+p1 <- ggpubr::ggdonutchart(plot.data, "Freq",
+    lab.pos = "out",
+    label = "Label",
+    fill = "Region",
+    color = "white",
+    palette = c("#60ba64", "#73c6ff", "#620fa3", "#ffc554")
+)
+
+plot.data <- as.data.frame(table(peaks$encodeLabel))
+plot.data$percent <- paste0(format(round(plot.data$Freq * 100 / sum(plot.data$Freq), 1),
+    trim = TRUE
+), "%")
+colnames(plot.data)[1] <- "cCREs"
+plot.data$Label <- paste(plot.data$Freq, "\n(", plot.data$percent, ")", sep = "")
+p2 <- ggpubr::ggdonutchart(plot.data, "Freq",
+    lab.pos = "out",
+    label = "Label",
+    fill = "cCREs",
+    color = "white",
+    palette = c("#ff0000", "#ffa700", "#ffcd00", "#ffaaaa", "#00b0f0", "gray")
+)
+
+pdf("Pie.peak.distribution.pdf", 10, 5)
+p1 + p2 + patchwork::plot_layout(ncol = 2)
+dev.off()
+
+rm(cCRE.bed, repeats.bed, hit)
 save(CNV.FC, sample.info, anno.col, anno.row, anno.color,
     file = "CRC_CNV.rda"
 )
