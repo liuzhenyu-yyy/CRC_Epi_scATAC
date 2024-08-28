@@ -382,6 +382,27 @@ ggplot(sample.info.ITH, aes(x = Module.iCMS2, y = factor(Subclone,
     scale_fill_manual(values = mycolor$Subclone)
 dev.off()
 
+plot.data <- data.frame(
+    "Subclone" = unique(sample.info.ITH$Subclone) %>% sort(),
+    "score" = aggregate(sample.info.ITH$Module.iCMS2, by = list(sample.info.ITH$Subclone), mean)$x,
+    "sd" = aggregate(sample.info.ITH$Module.iCMS2, by = list(sample.info.ITH$Subclone), sd)$x,
+    "distance" = c(20, 18, 20, 4, 10),
+    "nCell" = aggregate(sample.info.ITH$Module.iCMS2, by = list(sample.info.ITH$Subclone), length)$x
+)
+pdf("Scatter.Module.iCMS2.pdf", 4, 3.5)
+ggplot(plot.data, aes(x = distance, y = score)) +
+    geom_smooth(method = "lm", se = TRUE) +
+    geom_point(aes(color = Subclone), size = 3, show.legend = FALSE) +
+    ggrepel::geom_text_repel(aes(label = Subclone, color = Subclone), size = 4, show.legend = FALSE) +
+    # geom_errorbar(aes(ymin = score - sd, ymax = score + sd), width = 0.2) +
+    scale_color_manual(values = mycolor$Subclone) +
+    ggpubr::stat_cor(method = "pearson", digits = 4) +
+    xlim(c(3, 25)) +
+    xlab("Branch distance from healthy diploid") +
+    ylab("iCMS2 module expression") +
+    theme_classic()
+dev.off()
+
 ## 2.4 subclone-by-arm copy number matrix ----
 # sliding window
 sw <- readRDS("../01.All_scCNV/sw.rds")
