@@ -1060,6 +1060,50 @@ pdf("TF_gene_module/Scatter.TF_Module_iCMS.pdf", 8, 5)
 patchwork::wrap_plots(p.list, ncol = 3)
 dev.off()
 
+## 6.4. split iCMS TF modules ----
+ME.selected <- c(5, 6, 8, 9)
+TF.me.split <- list()
+
+for (i in seq_along(ME.selected)) {
+    gene.selected <- net$colors[net$colors == ME.selected[i]] %>% names()
+    TF.me.split[[paste("ME", ME.selected[i], sep = "", "_Pos")]] <-
+        gene.selected[cor.gene.module[gene.selected, paste("ME", ME.selected[i], sep = "")] > 0]
+    TF.me.split[[paste("ME", ME.selected[i], sep = "", "_Neg")]] <-
+        gene.selected[cor.gene.module[gene.selected, paste("ME", ME.selected[i], sep = "")] < 0]
+}
+rm(i, gene.selected)
+
+ME.split <- matrix(0, nrow = nrow(MEs), ncol = length(TF.me.split)) %>% as.data.frame()
+rownames(ME.split) <- rownames(MEs)
+colnames(ME.split) <- names(TF.me.split)
+
+identical(rownames(MEs), rownames(MotifMat.cluster))
+for (one in names(TF.me.split)) {
+    ME.split[, one] <- rowMeans(MotifMat.cluster[, TF.me.split[[one]]], na.rm = TRUE)
+}
+
+identical(rownames(ME.split), rownames(Module.Mat.cluster))
+
+cor.TF.iCMS <- cor(ME.split, Module.Mat.cluster, use = "p")
+p.TF.iCMS <- corPvalueStudent(cor.TF.iCMS, nrow(MotifMat.cluster))
+cor.TF.iCMS <- t(cor.TF.iCMS) %>% as.data.frame()
+p.TF.iCMS <- t(p.TF.iCMS) %>% as.data.frame()
+
+pdf("TF_gene_module/Heatmap.cor.TF_iCMS.split.pdf", 7, 4)
+corrplot(
+    (as.matrix(cor.TF.iCMS)),
+    method = "color",
+    # addCoef.col = "black",
+    tl.col = "black",
+    tl.cex = 1,
+    p.mat = as.matrix(p.TF.iCMS),
+    sig.level = c(0.001, 0.01, 0.05),
+    pch.cex = 1.3,
+    insig = "label_sig",
+    col = colorRampPalette(rev(brewer.pal(9, "RdBu")))(100)
+)
+dev.off()
+
 # 7. module and epi cell type ----
 dir.create("TF_Adenoma")
 
